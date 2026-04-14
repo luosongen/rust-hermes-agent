@@ -1,0 +1,25 @@
+[package]
+name = "hermes-platform-wecom"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio.workspace = true
+reqwest.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde-xml-rs.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+axum.workspace = true
+aes.workspace = true
+sha1.workspace = true
+base64.workspace = true
+hermes-core.workspace = true
+hermes-memory.workspace = true
+
+[dev-dependencies]
+axum.workspace = true
+tokio.workspace = true

@@ -1,0 +1,353 @@
+use crate::{Message, NewMessage, NewSession, SearchResult, Session, SessionStore};
+use async_trait::async_trait;
+use hermes_error::StorageError;
+use sqlx::{SqlitePool, FromRow};
+use std::path::PathBuf;
+use std::time::SystemTime;
+
+const SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    source TEXT NOT NULL,
+    user_id TEXT,
+    model TEXT,
+    model_config TEXT,
+    system_prompt TEXT,
+    parent_session_id TEXT,
+    started_at REAL NOT NULL,
+    ended_at REAL,
+    end_reason TEXT,
+    message_count INTEGER DEFAULT 0,
+    tool_call_count INTEGER DEFAULT 0,
+    input_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    cache_read_tokens INTEGER DEFAULT 0,
+    cache_write_tokens INTEGER DEFAULT 0,
+    reasoning_tokens INTEGER DEFAULT 0,
+    billing_provider TEXT,
+    billing_base_url TEXT,
+    billing_mode TEXT,
+    estimated_cost_usd REAL,
+    actual_cost_usd REAL,
+    title TEXT,
+    metadata TEXT
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT,
+    tool_call_id TEXT,
+    tool_calls TEXT,
+    tool_name TEXT,
+    timestamp REAL NOT NULL,
+    token_count INTEGER,
+    finish_reason TEXT,
+    reasoning TEXT,
+    FOREIGN KEY (session_id) REFERENCES sessions(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_source ON sessions(source);
+CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_session_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_started ON sessions(started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, timestamp);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+    content,
+    content=messages,
+    content_rowid=id
+);
+
+CREATE TRIGGER IF NOT EXISTS messages_fts_insert AFTER INSERT ON messages BEGIN
+    INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
+END;
+"#;
+
+pub struct SqliteSessionStore {
+    pool: SqlitePool,
+}
+
+impl SqliteSessionStore {
+    pub async fn new(db_path: PathBuf) -> Result<Self, StorageError> {
+        let database_url = format!("sqlite:{}?mode=rwc", db_path.display());
+        let pool = SqlitePool::connect(&database_url)
+            .await
+            .map_err(|e| StorageError::Connection(e.to_string()))?;
+
+        sqlx::query(SCHEMA)
+            .execute(&pool)
+            .await
+            .map_err(|e| StorageError::Migration(e.to_string()))?;
+
+        Ok(Self { pool })
+    }
+}
+
+#[derive(Debug, FromRow)]
+struct SessionDbRow {
+    id: String,
+    source: String,
+    user_id: Option<String>,
+    model: Option<String>,
+    model_config: Option<String>,
+    system_prompt: Option<String>,
+    parent_session_id: Option<String>,
+    started_at: f64,
+    ended_at: Option<f64>,
+    end_reason: Option<String>,
+    message_count: i64,
+    tool_call_count: i64,
+    input_tokens: i64,
+    output_tokens: i64,
+    cache_read_tokens: i64,
+    cache_write_tokens: i64,
+    reasoning_tokens: i64,
+    billing_provider: Option<String>,
+    billing_base_url: Option<String>,
+    billing_mode: Option<String>,
+    estimated_cost_usd: Option<f64>,
+    actual_cost_usd: Option<f64>,
+    title: Option<String>,
+    metadata: Option<String>,
+}
+
+impl From<SessionDbRow> for Session {
+    fn from(r: SessionDbRow) -> Self {
+        Session {
+            id: r.id,
+            source: r.source,
+            user_id: r.user_id,
+            model: r.model,
+            model_config: r.model_config,
+            system_prompt: r.system_prompt,
+            parent_session_id: r.parent_session_id,
+            started_at: r.started_at,
+            ended_at: r.ended_at,
+            end_reason: r.end_reason,
+            message_count: r.message_count as usize,
+            tool_call_count: r.tool_call_count as usize,
+            input_tokens: r.input_tokens as usize,
+            output_tokens: r.output_tokens as usize,
+            cache_read_tokens: r.cache_read_tokens as usize,
+            cache_write_tokens: r.cache_write_tokens as usize,
+            reasoning_tokens: r.reasoning_tokens as usize,
+            billing_provider: r.billing_provider,
+            billing_base_url: r.billing_base_url,
+            billing_mode: r.billing_mode,
+            estimated_cost_usd: r.estimated_cost_usd,
+            actual_cost_usd: r.actual_cost_usd,
+            title: r.title,
+            metadata: r.metadata,
+        }
+    }
+}
+
+#[derive(Debug, FromRow)]
+struct MessageDbRow {
+    id: i64,
+    session_id: String,
+    role: String,
+    content: Option<String>,
+    tool_call_id: Option<String>,
+    tool_calls: Option<String>,
+    tool_name: Option<String>,
+    timestamp: f64,
+    token_count: Option<i64>,
+    finish_reason: Option<String>,
+    reasoning: Option<String>,
+}
+
+impl From<MessageDbRow> for Message {
+    fn from(r: MessageDbRow) -> Self {
+        Message {
+            id: r.id,
+            session_id: r.session_id,
+            role: r.role,
+            content: r.content,
+            tool_call_id: r.tool_call_id,
+            tool_calls: r.tool_calls,
+            tool_name: r.tool_name,
+            timestamp: r.timestamp,
+            token_count: r.token_count.map(|v| v as usize),
+            finish_reason: r.finish_reason,
+            reasoning: r.reasoning,
+        }
+    }
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct SearchDbRow {
+    id: i64,
+    session_id: String,
+    content: Option<String>,
+    snippet: String,
+}
+
+impl From<SearchDbRow> for SearchResult {
+    fn from(r: SearchDbRow) -> Self {
+        SearchResult {
+            id: r.id,
+            session_id: r.session_id,
+            content: r.content.unwrap_or_default(),
+            snippet: r.snippet,
+        }
+    }
+}
+
+#[async_trait]
+impl SessionStore for SqliteSessionStore {
+    async fn create_session(&self, session: NewSession) -> Result<Session, StorageError> {
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs_f64();
+
+        sqlx::query(
+            r#"INSERT INTO sessions (id, source, user_id, model, started_at, message_count, tool_call_count)
+               VALUES (?, ?, ?, ?, ?, 0, 0)"#,
+        )
+        .bind(&session.id)
+        .bind(&session.source)
+        .bind(&session.user_id)
+        .bind(&session.model)
+        .bind(now)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StorageError::Query(e.to_string()))?;
+
+        Ok(Session {
+            id: session.id,
+            source: session.source,
+            user_id: session.user_id,
+            model: session.model,
+            model_config: None,
+            system_prompt: None,
+            parent_session_id: None,
+            started_at: now,
+            ended_at: None,
+            end_reason: None,
+            message_count: 0,
+            tool_call_count: 0,
+            input_tokens: 0,
+            output_tokens: 0,
+            cache_read_tokens: 0,
+            cache_write_tokens: 0,
+            reasoning_tokens: 0,
+            billing_provider: None,
+            billing_base_url: None,
+            billing_mode: None,
+            estimated_cost_usd: None,
+            actual_cost_usd: None,
+            title: None,
+            metadata: None,
+        })
+    }
+
+    async fn get_session(&self, session_id: &str) -> Result<Option<Session>, StorageError> {
+        let row: Option<SessionDbRow> = sqlx::query_as(
+            "SELECT * FROM sessions WHERE id = ?"
+        )
+        .bind(session_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| StorageError::Query(e.to_string()))?;
+
+        Ok(row.map(|r| r.into()))
+    }
+
+    async fn append_message(
+        &self,
+        session_id: &str,
+        message: NewMessage,
+    ) -> Result<Message, StorageError> {
+        let timestamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs_f64();
+
+        let id: i64 = sqlx::query_scalar(
+            r#"INSERT INTO messages (session_id, role, content, tool_call_id, tool_calls, tool_name, timestamp, token_count, finish_reason, reasoning)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               RETURNING id"#,
+        )
+        .bind(session_id)
+        .bind(&message.role)
+        .bind(&message.content)
+        .bind(&message.tool_call_id)
+        .bind(&message.tool_calls)
+        .bind(&message.tool_name)
+        .bind(timestamp)
+        .bind(message.token_count.map(|v| v as i64))
+        .bind(&message.finish_reason)
+        .bind(&message.reasoning)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| StorageError::Query(e.to_string()))?;
+
+        // Update message count
+        sqlx::query("UPDATE sessions SET message_count = message_count + 1 WHERE id = ?")
+            .bind(session_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| StorageError::Query(e.to_string()))?;
+
+        Ok(Message {
+            id,
+            session_id: session_id.to_string(),
+            role: message.role,
+            content: message.content,
+            tool_call_id: message.tool_call_id,
+            tool_calls: message.tool_calls,
+            tool_name: message.tool_name,
+            timestamp,
+            token_count: message.token_count,
+            finish_reason: message.finish_reason,
+            reasoning: message.reasoning,
+        })
+    }
+
+    async fn get_messages(
+        &self,
+        session_id: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<Message>, StorageError> {
+        let rows: Vec<MessageDbRow> = sqlx::query_as(
+            "SELECT * FROM messages WHERE session_id = ? ORDER BY timestamp LIMIT ? OFFSET ?"
+        )
+        .bind(session_id)
+        .bind(limit as i64)
+        .bind(offset as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StorageError::Query(e.to_string()))?;
+
+        Ok(rows.into_iter().map(|r| r.into()).collect())
+    }
+
+    async fn search_messages(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<SearchResult>, StorageError> {
+        let rows: Vec<SearchDbRow> = sqlx::query_as(
+            r#"SELECT m.id, m.session_id, m.content,
+                      snippet('messages_fts', 0, '<mark>', '</mark>', '...', 32) as snippet
+               FROM messages_fts
+               JOIN messages m ON messages_fts.rowid = m.id
+               WHERE messages_fts MATCH ?
+               ORDER BY rank
+               LIMIT ?"#
+        )
+        .bind(query)
+        .bind(limit as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StorageError::Query(e.to_string()))?;
+
+        Ok(rows.into_iter().map(|r| r.into()).collect())
+    }
+}

@@ -1,0 +1,221 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fmt;
+use std::path::PathBuf;
+
+// =============================================================================
+// Role & Content
+// =============================================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Role {
+    System,
+    User,
+    Assistant,
+    Tool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Content {
+    Text(String),
+    Image { url: String, detail: Option<String> },
+    ToolResult { tool_call_id: String, content: String },
+}
+
+// =============================================================================
+// Message
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Message {
+    pub role: Role,
+    pub content: Content,
+    pub reasoning: Option<String>,
+    pub tool_call_id: Option<String>,
+    pub tool_name: Option<String>,
+}
+
+impl Message {
+    pub fn user(content: impl Into<Content>) -> Self {
+        Message {
+            role: Role::User,
+            content: content.into(),
+            reasoning: None,
+            tool_call_id: None,
+            tool_name: None,
+        }
+    }
+
+    pub fn assistant(content: impl Into<Content>) -> Self {
+        Message {
+            role: Role::Assistant,
+            content: content.into(),
+            reasoning: None,
+            tool_call_id: None,
+            tool_name: None,
+        }
+    }
+
+    pub fn system(content: impl Into<Content>) -> Self {
+        Message {
+            role: Role::System,
+            content: content.into(),
+            reasoning: None,
+            tool_call_id: None,
+            tool_name: None,
+        }
+    }
+
+    pub fn tool_result(tool_call_id: impl Into<String>, content: impl Into<Content>) -> Self {
+        Message {
+            role: Role::Tool,
+            content: content.into(),
+            reasoning: None,
+            tool_call_id: Some(tool_call_id.into()),
+            tool_name: None,
+        }
+    }
+}
+
+impl From<String> for Content {
+    fn from(s: String) -> Self {
+        Content::Text(s)
+    }
+}
+
+impl From<&str> for Content {
+    fn from(s: &str) -> Self {
+        Content::Text(s.to_string())
+    }
+}
+
+impl Content {
+    pub fn as_text(&self) -> Option<&str> {
+        match self {
+            Content::Text(s) => Some(s),
+            _ => None,
+        }
+    }
+}
+
+// =============================================================================
+// ToolCall & ToolDefinition
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+    pub arguments: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolDefinition {
+    pub name: String,
+    pub description: String,
+    pub parameters: serde_json::Value,
+}
+
+// =============================================================================
+// FinishReason & Usage
+// =============================================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FinishReason {
+    Stop,
+    Length,
+    ContentFilter,
+    Other,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Usage {
+    pub input_tokens: usize,
+    pub output_tokens: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_read_tokens: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_write_tokens: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_tokens: Option<usize>,
+}
+
+// =============================================================================
+// ChatResponse & ChatRequest
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatResponse {
+    pub content: String,
+    pub finish_reason: FinishReason,
+    pub tool_calls: Option<Vec<ToolCall>>,
+    pub reasoning: Option<String>,
+    pub usage: Option<Usage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatRequest {
+    pub model: ModelId,
+    pub messages: Vec<Message>,
+    pub tools: Option<Vec<ToolDefinition>>,
+    pub system_prompt: Option<String>,
+    pub temperature: Option<f32>,
+    pub max_tokens: Option<usize>,
+}
+
+// =============================================================================
+// ModelId
+// =============================================================================
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ModelId {
+    pub provider: String,
+    pub model: String,
+}
+
+impl ModelId {
+    pub fn new(provider: impl Into<String>, model: impl Into<String>) -> Self {
+        Self {
+            provider: provider.into(),
+            model: model.into(),
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        let parts: Vec<&str> = s.split('/').collect();
+        if parts.len() != 2 {
+            return None;
+        }
+        Some(ModelId {
+            provider: parts[0].to_string(),
+            model: parts[1].to_string(),
+        })
+    }
+}
+
+impl fmt::Display for ModelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.provider, self.model)
+    }
+}
+
+// =============================================================================
+// ToolContext
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolContext {
+    pub session_id: String,
+    pub working_directory: PathBuf,
+    pub user_id: Option<String>,
+    pub task_id: Option<String>,
+}
+
+// =============================================================================
+// StreamingCallback
+// =============================================================================
+
+pub type StreamingCallback = Box<dyn Fn(ChatResponse) + Send + Sync>;

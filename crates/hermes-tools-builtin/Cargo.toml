@@ -1,0 +1,19 @@
+[package]
+name = "hermes-tools-builtin"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio.workspace = true
+reqwest.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+dirs.workspace = true
+regex.workspace = true
+hermes-core.workspace = true
+hermes-tool-registry.workspace = true
+hermes-skills.workspace = true
+parking_lot.workspace = true

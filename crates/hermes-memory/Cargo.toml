@@ -1,0 +1,21 @@
+[package]
+name = "hermes-memory"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio.workspace = true
+sqlx.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+once_cell.workspace = true
+parking_lot.workspace = true
+async-trait.workspace = true
+hermes-error.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,24 @@
+[package]
+name = "hermes-agent"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "hermes"
+path = "src/main.rs"
+
+[dependencies]
+tokio.workspace = true
+clap.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+hermes-cli.workspace = true
+hermes-core.workspace = true
+hermes-gateway.workspace = true
+hermes-platform-telegram.workspace = true
+hermes-platform-wecom.workspace = true
+hermes-memory.workspace = true
+hermes-tool-registry.workspace = true
+axum.workspace = true
+tower-http.workspace = true

@@ -1,0 +1,27 @@
+[package]
+name = "hermes-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+reqwest.workspace = true
+hermes-error.workspace = true
+hermes-memory.workspace = true
+rand.workspace = true
+parking_lot.workspace = true
+axum.workspace = true
+figment.workspace = true
+dirs.workspace = true
+serde_yaml.workspace = true
+toml.workspace = true
+tower.workspace = true
+tower-http.workspace = true
