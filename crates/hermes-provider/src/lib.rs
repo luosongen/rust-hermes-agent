@@ -27,6 +27,7 @@ pub mod anthropic;
 pub mod openrouter;
 pub mod glm;
 pub mod minimax;
+pub mod kimi;
 
 pub use traits::*;
 pub use openai::OpenAiProvider;
@@ -34,3 +35,4 @@ pub use anthropic::AnthropicProvider;
 pub use openrouter::OpenRouterProvider;
 pub use glm::GlmProvider;
 pub use minimax::MiniMaxProvider;
+pub use kimi::KimiProvider;
