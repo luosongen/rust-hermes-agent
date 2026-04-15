@@ -1,3 +1,27 @@
+//! Agent 主循环模块
+//!
+//! 本模块是 hermes-core 的核心——实现了 Agent 的主体逻辑，即与 LLM 交互、
+//! 调度工具、处理响应的主循环。
+//!
+//! ## 主要类型
+//! - **AgentConfig**: Agent 配置，包含最大迭代次数、模型、温度、最大 token 数和工作目录
+//! - **Agent**: 主 Agent 结构体，持有一个 LLM Provider、一个工具调度器和一个会话存储
+//!
+//! ## Agent 循环逻辑
+//! 1. 从会话存储加载历史消息（或创建空消息列表）
+//! 2. 将用户输入追加到消息列表
+//! 3. 循环迭代（最多 max_iterations 次）:
+//!    a. 调用 LLM Provider 的 `chat()` 发送请求
+//!    b. 若 LLM 返回工具调用，则执行工具并追加结果，继续循环
+//!    c. 若 LLM 返回停止，则保存到会话存储并返回响应
+//!    d. 处理各种 `FinishReason`（长度超出、内容过滤、未知）
+//!
+//! ## 与其他模块的关系
+//! - 依赖 `LlmProvider`（`provider.rs`）进行 LLM 调用
+//! - 依赖 `ToolDispatcher`（`tool_dispatcher.rs`）执行工具
+//! - 依赖 `SessionStore`（`hermes-memory`）持久化会话历史
+//! - 定义了 `AgentError` 相关的错误转换
+
 use crate::{
     AgentError, ChatRequest, ConversationRequest, ConversationResponse, LlmProvider, ModelId,
     Role, ToolContext, ToolDispatcher,

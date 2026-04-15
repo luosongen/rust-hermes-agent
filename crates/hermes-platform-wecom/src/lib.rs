@@ -1,3 +1,26 @@
+//! ## hermes-platform-wecom
+//!
+//! 企业微信（WeCom）平台适配器，将企业微信 Webhook 集成到 Hermes 网关。
+//!
+//! ### 功能概述
+//! - **签名验证**：校验 URL 参数中的 `msg_signature`、`timestamp`、`nonce`
+//! - **AES 解密**：使用 AES-256-CBC 解密消息体中的 `encrypt` 字段
+//! - **入站解析**：解密后解析 XML 格式的 WeCom 消息
+//! - **出站发送**：日志记录响应内容（当前为占位实现）
+//!
+//! ### 安全机制
+//! 采用 AES-256-CBC 加密，需要以下配置：
+//! - `token`：企业微信后台配置的 Token
+//! - `aes_key`（Base64 编码）：43 位的 AES 密钥
+//!
+//! ### 解密流程
+//! ```text
+//! 密文（Base64）→ Base64解码 → 分离IV → CBC解密 → PKCS7去填充 → XML原文
+//! ```
+//!
+//! ### 消息格式
+//! - 会话 ID 格式：`wecom:{FromUserName}`
+
 use aes::cipher::KeyInit;
 use async_trait::async_trait;
 use axum::body::Body;

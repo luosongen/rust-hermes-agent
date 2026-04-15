@@ -1,3 +1,24 @@
+//! 重试策略模块
+//!
+//! 本模块定义了 LLM Provider 调用失败时的重试策略，采用指数退避（exponential backoff）算法。
+//!
+//! ## 主要类型
+//! - **RetryPolicy**: 重试策略配置结构体
+//!   - `max_retries` — 最大重试次数（不包含初始调用）
+//!   - `base_delay` — 首次重试的基础延迟
+//!   - `max_delay` — 延迟上限
+//!   - `full_jitter` — 是否使用完全随机抖动
+//!
+//! ## 重试延迟计算
+//! 采用指数退避 + 抖动的算法：
+//! - 延迟 = min(base_delay * 2^attempt, max_delay)
+//! - 若启用完整抖动：延迟为 `[0, 上限]` 范围内的随机值
+//! - 若启用半抖动：延迟为 `[上限/2, 上限]` 范围内的随机值
+//!
+//! ## 与其他模块的关系
+//! - 被 `retrying_provider.rs` 使用来计算重试等待时间
+//! - 配置通过 `Config::load()` 从配置/环境变量加载
+
 use std::time::Duration;
 
 /// Configuration for retry behavior with exponential backoff.

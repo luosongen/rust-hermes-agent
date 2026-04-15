@@ -1,3 +1,23 @@
+//! 类型定义模块
+//!
+//! 本模块定义了 hermes-core 中所有核心数据类型，是整个库的基础类型层。
+//!
+//! ## 主要类型
+//! - **角色与内容**: `Role`（消息角色）、`Content`（消息内容，支持文本/图片/工具结果）
+//! - **消息**: `Message` — 包含角色、内容、推理内容、工具调用信息的完整消息结构
+//! - **工具调用**: `ToolCall`（工具调用请求）、`ToolDefinition`（工具的 schema 定义）
+//! - **LLM 请求/响应**: `ChatRequest`、`ChatResponse`、`FinishReason`、`Usage`
+//! - **模型标识**: `ModelId` — 格式为 `provider/model-name`（如 `openai/gpt-4o`）
+//! - **工具上下文**: `ToolContext` — 工具执行时的会话和工作目录信息
+//! - **流式回调**: `StreamingCallback` — 用于处理流式响应的回调函数类型
+//!
+//! ## 与其他模块的关系
+//! - 被 `provider.rs`（LLM Provider 的请求/响应类型）
+//! - 被 `agent.rs`（Agent 的消息构建和解析）
+//! - 被 `conversation.rs`（会话请求/响应包装）
+//! - 被 `gateway.rs`（入站消息的原始数据存储）
+//! - 被 `tool_dispatcher.rs`（工具调用的定义和分发）
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;

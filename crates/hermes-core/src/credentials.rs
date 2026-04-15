@@ -1,3 +1,26 @@
+//! 凭证池管理模块
+//!
+//! ## 模块用途
+//! 管理多个 API 凭证（API Key）的健康状态、负载均衡和自动冷却。
+//! 支持多凭证轮询（round-robin），并在失败时自动将凭证置入冷却期。
+//!
+//! ## 主要类型
+//! - **CredentialHealth**: 单个凭证的健康状态（可用性、冷却截止时间、连续失败次数）
+//! - **CredentialPool**: 凭证池，管理多个凭证的生命周期
+//!
+//! ## 工作原理
+//! - **添加凭证**: `add(name, key)` — 将新凭证加入池中
+//! - **获取凭证**: `get()` — 使用轮询策略从健康的凭证中返回一个（name, key）
+//! - **报告失败**: `report_failure()` — 累计 3 次失败后，凭证进入 60 秒冷却期
+//! - **报告限流**: `report_rate_limit()` — 凭证立即进入冷却（至少 60 秒）
+//! - **报告成功**: `report_success()` — 清除失败计数，恢复凭证可用性
+//! - **健康检查**: `health()` — 获取所有凭证的当前健康状态
+//!
+//! ## 与其他模块的关系
+//! - 被 `retrying_provider.rs` 使用来管理多凭证的负载均衡
+//! - 凭证从 `Config` 的 `credentials` 字段加载
+//! - 使用 `parking_lot::RwLock` 实现内部并发安全（读写锁）
+
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};

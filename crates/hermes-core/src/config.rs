@@ -1,12 +1,47 @@
-//! Hermes Agent 配置系统
+//! 配置系统模块
+//!
+//! ## 模块用途
+//! 管理 hermes-agent 的所有配置，包括默认模型、凭证、网关设置和消息平台配置。
+//! 支持从 TOML 配置文件、环境变量（`HERMES_*`）和代码默认值多层级加载。
 //!
 //! 配置文件位置: `~/.config/hermes-agent/config.toml` (符合 XDG 标准)
 //!
 //! 配置优先级（从高到低）:
-//! 1. CLI 参数
+//! 1. CLI 参数（由调用方单独处理）
 //! 2. 环境变量 (HERMES_*)
-//! 3. 配置文件
+//! 3. 配置文件 (~/.config/hermes-agent/config.toml)
 //! 4. 默认值
+//!
+//! ## 主要类型
+//! - **Config**: 主配置结构，包含 defaults、credentials、gateway 三个子配置
+//! - **DefaultsConfig**: 默认配置（默认模型、是否启用工具）
+//! - **GatewayConfig**: HTTP 网关配置（端口、主机、已配置的平台）
+//! - **PlatformConfig**: 消息平台配置（支持 Telegram 和 WeCom）
+//! - **ConfigError**: 配置加载/保存错误
+//!
+//! ## 关键方法
+//! - `Config::load()` — 从所有来源加载配置
+//! - `Config::get()/set()` — 通过点号分隔的键访问配置（如 `defaults.model`）
+//! - `Config::save()` — 保存配置到文件（权限设为 0o600 保证安全）
+//! - `Config::get_cached()` — 获取缓存的配置实例（首次调用时懒加载）
+//! - `Config::display()` — 格式化配置用于显示（敏感值自动脱敏）
+//!
+//! ## 环境变量
+//! | 变量名 | 对应配置 |
+//! |--------|---------|
+//! | `HERMES_DEFAULT_MODEL` | defaults.model |
+//! | `HERMES_TOOLS_ENABLED` | defaults.tools_enabled |
+//! | `HERMES_GATEWAY_PORT` | gateway.port |
+//! | `HERMES_GATEWAY_HOST` | gateway.host |
+//! | `HERMES_OPENAI_API_KEY` | credentials.openai |
+//! | `HERMES_ANTHROPIC_API_KEY` | credentials.anthropic |
+//! | `HERMES_TELEGRAM_BOT_TOKEN` | gateway.platforms.telegram.bot_token |
+//! | `HERMES_TELEGRAM_VERIFY_TOKEN` | gateway.platforms.telegram.verify_token |
+//!
+//! ## 与其他模块的关系
+//! - 配置通过 `lib.rs` 被整个 crate 使用
+//! - 网关配置被 `gateway.rs` 使用来初始化 HTTP 服务器
+//! - 凭证被 `credentials.rs` 的 `CredentialPool` 使用
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

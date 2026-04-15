@@ -1,3 +1,10 @@
+//! ## hermes-gateway/error
+//!
+//! 网关层的错误类型定义。
+//!
+//! 所有错误均为结构化错误，包含具体的错误原因字符串，
+//! 方便日志记录和向上层传播。
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]

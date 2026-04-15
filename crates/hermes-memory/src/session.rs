@@ -1,6 +1,22 @@
+//! ## hermes-memory/session
+//!
+//! 会话和消息的领域类型定义。
+//!
+//! 本模块定义了会话存储的核心数据结构：
+//! - [`Session`] — 会话实体，包含元数据、token 统计和计费信息
+//! - [`NewSession`] — 创建新会话时使用的输入类型
+//! - [`Message`] — 会话中的消息记录
+//! - [`NewMessage`] — 追加消息时的输入类型
+//! - [`SearchResult`] — 消息搜索结果
+//! - [`SessionStore`] — 会话存储抽象 trait
+
 use serde::{Deserialize, Serialize};
 
-/// Session data
+/// 会话实体 — 存储会话的元数据和统计信息。
+///
+/// 包含会话 ID、来源、用户 ID、使用的模型、系统提示词、时间戳、
+/// token 使用量统计（input/output/cache/reasoning）、计费信息等字段。
+/// `message_count` 和 `tool_call_count` 在消息追加时自动递增。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
     pub id: String,
@@ -29,7 +45,7 @@ pub struct Session {
     pub metadata: Option<String>,
 }
 
-/// New session to create
+/// 创建新会话时的输入类型。
 #[derive(Debug, Clone)]
 pub struct NewSession {
     pub id: String,
@@ -38,7 +54,7 @@ pub struct NewSession {
     pub model: Option<String>,
 }
 
-/// Message in a session
+/// 会话中的单条消息记录。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub id: i64,
@@ -54,7 +70,7 @@ pub struct Message {
     pub reasoning: Option<String>,
 }
 
-/// New message to append
+/// 追加消息时的输入类型。
 #[derive(Debug, Clone)]
 pub struct NewMessage {
     pub role: String,
@@ -68,7 +84,7 @@ pub struct NewMessage {
     pub reasoning: Option<String>,
 }
 
-/// Search result
+/// 消息全文搜索结果，包含匹配片段（snippet）用于预览。
 #[derive(Debug, Clone)]
 pub struct SearchResult {
     pub id: i64,
@@ -77,7 +93,10 @@ pub struct SearchResult {
     pub snippet: String,
 }
 
-/// Session store trait
+/// 会话存储 trait — 抽象了会话和消息的持久化操作。
+///
+/// 由 [`crate::SqliteSessionStore`] 具体实现。
+/// 所有方法均为 async，由 sqlx 驱动 SQLite 数据库。
 use async_trait::async_trait;
 use hermes_error::StorageError;
 

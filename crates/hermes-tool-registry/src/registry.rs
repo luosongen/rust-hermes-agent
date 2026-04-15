@@ -1,3 +1,28 @@
+//! ToolRegistry — 工具注册与调度实现
+//!
+//! 本模块实现了 Agent 层的 `ToolDispatcher` trait，提供了：
+//!
+//! ## 核心类型
+//! - **`Tool`** — 所有工具必须实现的 trait，包含工具元数据和执行入口
+//! - **`ToolRegistry`** — 线程安全的工具注册表，负责注册、查询和分发
+//!
+//! ## Tool trait 方法说明
+//! - `name()` — 工具唯一标识名
+//! - `description()` — 工具描述，供 LLM 理解工具用途
+//! - `parameters()` — JSON Schema 格式的参数定义
+//! - `execute()` — 异步执行逻辑，接收 JSON 参数和 `ToolContext`
+//! - `precheck()` — 可选的预检查（默认空实现）
+//!
+//! ## ToolRegistry 公共 API
+//! - `new()` / `register()` / `unregister()` — 添加工具和移除工具
+//! - `get()` / `tool_names()` — 按名称查询工具或列出所有工具
+//! - `get_tool_definitions()` — 生成 `Vec<ToolDefinition>` 传给 LLM
+//! - `check_all_preconditions()` — 对所有工具执行预检查
+//! - `dispatch()` — 实现 `ToolDispatcher`，根据 ToolCall 分发执行
+//!
+//! ## 线程安全
+//! 使用 `parking_lot::RwLock` 保护内部 HashMap，写线程安全，读可并发
+
 use async_trait::async_trait;
 use hermes_core::{ToolContext, ToolDefinition, ToolDispatcher, ToolError};
 use parking_lot::RwLock;

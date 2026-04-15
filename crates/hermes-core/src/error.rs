@@ -1,3 +1,23 @@
+//! 错误类型模块
+//!
+//! 本模块定义了 hermes-core 中所有自定义错误类型，基于 `thiserror` 库实现。
+//!
+//! ## 主要错误类型
+//! - **AgentError**: Agent 主循环的错误（Provider/Tool/Storage/Session/Platform 错误的汇总）
+//! - **ProviderError**: LLM Provider 调用中的错误（API 错误、认证失败、限流、上下文过长等）
+//! - **ToolError**: 工具执行错误（执行失败、参数无效、缺少环境变量、权限拒绝、超时等）
+//! - **SessionError**: 会话管理错误（会话不存在、过期、损坏）
+//! - **PlatformError**: 消息平台适配器错误（连接失败、认证、限流、消息格式错误、Webhook 验证失败）
+//!
+//! ## ProviderError 的辅助方法
+//! - `is_retryable()` — 判断错误是否值得重试（限流/API/网络错误返回 true）
+//! - `retry_after_secs()` — 获取建议的重试等待秒数（仅限流错误有值）
+//!
+//! ## 与其他模块的关系
+//! - 所有错误类型被 `lib.rs` 重新导出（`pub use error::*`）
+//! - `StorageError` 来自外部的 `hermes-error` crate
+//! - 各错误类型被对应的模块（`agent.rs`、`provider.rs`、`tool_dispatcher.rs` 等）使用
+
 use thiserror::Error;
 pub use hermes_error::StorageError;
 

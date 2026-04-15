@@ -4,6 +4,47 @@ use serde::{Deserialize, Serialize};
 use reqwest::Client;
 
 // =============================================================================
+// OpenAI API 提供者实现
+// =============================================================================
+//
+// 该模块实现了 [`crate::traits::LlmProvider`] trait，提供了与 OpenAI Chat API 的交互能力。
+//
+// ## 请求转换
+//
+// [`OpenAiProvider::convert_request`] 负责将通用的 `ChatRequest` 转换为 OpenAI API 的请求格式：
+// - 将 `Role` 枚举映射为 OpenAI 的角色字符串（"system"、"user"、"assistant"、"tool"）
+// - 将 `Content` 类型映射为消息内容（支持文本、图片 URL、工具结果）
+// - 将系统提示词作为首条 system 消息插入
+// - 将工具定义转换为 OpenAI 的 function calling 格式
+//
+// ## 响应转换
+//
+// [`OpenAiProvider::convert_response`] 负责将 OpenAI API 的响应转换为通用的 `ChatResponse`：
+// - 提取消息内容
+// - 解析 finish_reason（如 "stop"、"length"、"content_filter"）
+// - 将工具调用（tool_calls）转换为统一的 `ToolCall` 结构
+// - 提取 token 使用量统计
+//
+// ## 错误处理
+//
+// 常见的 HTTP 状态码会被转换为对应的 `ProviderError`：
+// - `401` → `ProviderError::Auth`（认证失败）
+// - `429` → `ProviderError::RateLimit`（限流，60秒后重试）
+// - 其他错误码 → `ProviderError::Api`（包含状态码和响应体）
+//
+// ## 支持的模型
+//
+// - `openai/gpt-4o` - 128K 上下文窗口
+// - `openai/gpt-4-turbo` - 128K 上下文窗口
+// - `openai/gpt-4` - 8K 上下文窗口
+// - `openai/gpt-3.5-turbo` - 16K 上下文窗口
+//
+// ## 流式输出
+//
+// [`chat_streaming`] 方法当前返回 `Err(ProviderError::Api("Streaming not yet implemented"))`，
+// 表示流式输出功能尚未实现。
+
+// =============================================================================
 // OpenAI API Request/Response Types
 // =============================================================================
 

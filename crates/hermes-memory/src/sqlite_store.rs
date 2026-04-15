@@ -1,3 +1,40 @@
+//! SQLite 会话存储实现
+//!
+//! 本模块实现了 `hermes-memory` 中定义的 `SessionStore` trait，使用 SQLite 作为持久化后端。
+//!
+//! ## 数据库架构
+//!
+//! 数据库包含以下表：
+//!
+//! - **`sessions`** — 存储会话元数据。每个会话有一个唯一 ID、来源（source）、
+//!   使用的模型、token 统计、计费信息、结束原因等。sessions 表上还建立了
+//!   `source`、`parent_session_id`、`started_at` 的索引以加速常见查询。
+//!
+//! - **`messages`** — 存储会话中的每条消息。每条消息关联到一个 session_id，
+//!   包含角色（user/assistant）、内容、工具调用信息和时间戳。通过
+//!   `(session_id, timestamp)` 复合索引加速按时间顺序获取消息。
+//!
+//! - **`messages_fts`** — FTS5 虚拟表，提供消息内容的全文搜索能力。
+//!   通过触发器与 `messages` 表保持同步。当插入新消息时，自动索引其内容。
+//!
+//! ## SqliteSessionStore
+//!
+//! 核心结构体 `SqliteSessionStore` 持有 `SqlitePool` 连接池，并实现了以下方法：
+//!
+//! - **`new(db_path)`** — 异步构造方法。创建连接池并执行数据库迁移（创建表和索引）。
+//!
+//! ## DB 行类型转换
+//!
+//! 模块定义了三个内部 DB 行类型（`SessionDbRow`、`MessageDbRow`、`SearchDbRow`）
+//! 以及对应的 `From` 实现，用于将 sqlx 查询结果转换为公共领域类型。
+//!
+//! ## 错误处理
+//!
+//! 所有数据库操作返回 `StorageError`，区分三类错误来源：
+//! - `Connection` — 无法建立数据库连接
+//! - `Migration` — schema 初始化失败
+//! - `Query` — SQL 查询执行失败
+
 use crate::{Message, NewMessage, NewSession, SearchResult, Session, SessionStore};
 use async_trait::async_trait;
 use hermes_error::StorageError;

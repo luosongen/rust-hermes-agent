@@ -1,3 +1,40 @@
+//! 技能加载模块
+//!
+//! 负责从文件系统加载技能文件（Markdown 格式），解析 YAML frontmatter 元数据，
+//! 并提取代码块和示例。
+//!
+//! ## 技能文件格式
+//! ```markdown
+//! ---
+//! name: skill-name
+//! description: 技能描述
+//! platforms: [cli, gateway]
+//! metadata:
+//!   version: "1.0"
+//!   config:
+//!     - key: example_key
+//!       description: 配置项描述
+//!       default: default_value
+//! ---
+//!
+//! 这里是技能的实际内容...
+//! ```
+//!
+//! ## 核心类型
+//! - `Skill`: 表示一个已加载的技能，包含元数据、正文内容、代码块和示例
+//! - `CodeBlock`: 从 Markdown 正文中提取的代码块（包含语言和代码内容）
+//! - `SkillLoader`: 从指定目录加载所有技能文件
+//!
+//! ## 主要方法
+//! - `Skill::from_path()`: 从文件路径加载并解析单个技能
+//! - `SkillLoader::load_all()`: 从所有配置目录加载技能
+//! - `SkillLoader::default_dirs()`: 获取默认技能目录（`~/.hermes/skills` 和 `./skills`）
+//!
+//! ## 与其他模块的关系
+//! - 依赖 `metadata::SkillMetadata` 存储解析后的元数据
+//! - 依赖 `error::SkillError` 报告解析错误
+//! - 正则表达式用于提取 Markdown 中的代码块和示例
+
 use crate::error::SkillError;
 use crate::metadata::SkillMetadata;
 use regex::Regex;

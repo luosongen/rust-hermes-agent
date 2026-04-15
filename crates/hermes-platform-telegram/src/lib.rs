@@ -1,3 +1,21 @@
+//! ## hermes-platform-telegram
+//!
+//! Telegram 平台适配器，将 Telegram Bot Webhook 集成到 Hermes 网关。
+//!
+//! ### 功能概述
+//! - **Webhook 验证**：通过 URL 查询参数中的 `secret_token` 与预设值比对
+//! - **入站解析**：将 Telegram Update JSON 解析为 `InboundMessage`
+//! - **出站发送**：通过 Telegram Bot API `sendMessage` 接口回复用户
+//!
+//! ### 配置要求
+//! 创建适配器时需提供：
+//! - `bot_token`：Telegram Bot Token（从 @BotFather 获取）
+//! - `verify_token`：自定义的 Webhook 验证密钥
+//!
+//! ### 消息格式
+//! - 会话 ID 格式：`telegram:{chat_id}`
+//! - 支持 Markdown 解析模式
+
 use async_trait::async_trait;
 use axum::body::Body;
 use axum::extract::Request;

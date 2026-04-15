@@ -1,3 +1,26 @@
+//! 技能注册表模块
+//!
+//! 提供内存中的技能注册表，用于管理已加载的技能。
+//!
+//! ## 模块用途
+//! - `SkillRegistry` 是技能加载后的内存存储容器
+//! - 支持按名称精确查找、按名称或描述模糊搜索
+//! - 防止同名技能重复注册
+//!
+//! ## 核心类型
+//! - `SkillRegistry`: HashMap 实现的内存注册表
+//!
+//! ## 主要方法
+//! - `register()`: 注册新技能，同名已存在时返回错误
+//! - `get()`: 按名称精确查找技能
+//! - `names()`: 列出所有已注册技能的名称
+//! - `search()`: 按名称或描述的子串搜索技能（不区分大小写）
+//! - `len()` / `is_empty()`: 查询注册表状态
+//!
+//! ## 与其他模块的关系
+//! - `Skill` 类型来自 `loader` 模块
+//! - `SkillError` 来自 `error` 模块
+
 use crate::error::SkillError;
 use crate::loader::Skill;
 use std::collections::HashMap;

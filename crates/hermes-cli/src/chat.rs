@@ -1,6 +1,27 @@
 //! Hermes Agent 交互式聊天 REPL
 //!
-//! 使用 tokio 的异步 I/O 实现交互式读取-执行-打印循环
+//! 使用 tokio 的异步 I/O 实现交互式读取-执行-打印循环（Read-Eval-Print Loop）。
+//!
+//! ## 模块用途
+//! 实现 CLI 的 `chat` 子命令：初始化 Agent、创建/恢复会话、循环读取用户输入、调用 Agent 处理并打印响应。
+//!
+//! ## 主要函数
+//! - `run_chat(...)`: 异步函数，启动完整的聊天会话流程
+//!
+//! ## 核心流程
+//! 1. 初始化 SQLite 会话存储（`SqliteSessionStore`）
+//! 2. 创建工具注册表（`ToolRegistry`），可选注册内置工具
+//! 3. 根据凭据构建 LLM Provider（`OpenAiProvider` 或带重试的 `RetryingProvider`）
+//! 4. 创建 Agent 实例
+//! 5. 创建或恢复会话
+//! 6. 进入 REPL 循环：读取 stdin → 调用 `agent.run_conversation()` → 打印响应
+//!
+//! ## 依赖关系
+//! - `hermes_core`: `Agent`、`AgentConfig`、`ConversationRequest`、`RetryingProvider`、`CredentialPool`、`RetryPolicy`
+//! - `hermes_memory`: `NewSession`、`SessionStore`、`SqliteSessionStore`
+//! - `hermes_provider`: `OpenAiProvider`
+//! - `hermes_tool_registry`: `ToolRegistry`
+//! - `hermes_tools_builtin`: `register_builtin_tools`
 
 use anyhow::Result;
 use hermes_core::{

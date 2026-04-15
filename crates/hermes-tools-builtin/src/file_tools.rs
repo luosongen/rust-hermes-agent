@@ -1,3 +1,24 @@
+//! file_tools — 内置文件读写工具
+//!
+//! 本模块提供两个文件系统工具，供 AI Agent 在工作目录中读写文件：
+//!
+//! ## 主要类型
+//! - **`ReadFileTool`** — 文件读取工具（名称：`read_file`）
+//!   - 参数：`path`（必填）、`offset`（行偏移，默认 0）、`limit`（最大行数，默认 1000）
+//!   - 行为：读取文件内容，返回 JSON 包含 `success`、`path`、`content`、`size`
+//!   - 安全：使用 `canonicalize()` 解析真实路径，防止 `../` 等路径遍历攻击
+//!   - 相对路径会基于 `context.working_directory` 解析
+//!
+//! - **`WriteFileTool`** — 文件写入工具（名称：`write_file`）
+//!   - 参数：`path`（必填）、`content`（必填）
+//!   - 行为：创建新文件或覆盖已有文件，返回 `success` 和写入字节数
+//!   - 不支持目录创建（依赖父目录已存在）
+//!
+//! ## 与其他模块的关系
+//! - 实现 `hermes_tool_registry::Tool` trait
+//! - 依赖 `hermes-core` 中的 `ToolContext`（获取工作目录）和 `ToolError`
+//! - 工具参数通过 `serde_json::Value` 传递，结果序列化为 JSON 字符串
+
 use async_trait::async_trait;
 use hermes_core::{ToolContext, ToolError};
 use serde_json::json;

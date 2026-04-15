@@ -1,3 +1,20 @@
+//! 技能模块错误类型定义
+//!
+//! 定义了技能加载、注册、执行过程中可能出现的所有错误。
+//!
+//! ## 错误类型
+//! - `Io`: IO 错误（文件读取失败等），自动从 `std::io::Error` 转换
+//! - `ParseFrontmatter`: frontmatter 解析错误（缺少分隔符、无效 YAML 等）
+//! - `Yaml`: YAML 解析错误
+//! - `NotFound`: 技能未找到
+//! - `AlreadyExists`: 注册时发现同名技能已存在
+//! - `InvalidPath`: 无效的技能文件路径
+//! - `Download`: 技能下载失败
+//! - `PlatformNotSupported`: 技能不支持当前平台
+//!
+//! ## 使用方式
+//! 使用 `thiserror` 派生 `Error` trait，支持 `?` 运算符自动传播。
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]

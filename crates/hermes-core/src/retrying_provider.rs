@@ -1,3 +1,21 @@
+//! 重试包装 Provider 模块
+//!
+//! 本模块是 `LlmProvider` 的装饰器（Decorator），在原有 Provider 基础上添加了：
+//! 1. **自动重试逻辑** — 根据 `RetryPolicy` 对可重试错误进行指数退避重试
+//! 2. **凭证池管理** — 通过 `CredentialPool` 实现多凭证的负载均衡和健康检查
+//!
+//! ## 工作原理
+//! - `chat()` 方法从凭证池获取一个健康的凭证，调用底层 Provider
+//! - 若调用失败且可重试，则根据 `RetryPolicy` 计算延迟后等待重试
+//! - 成功时报告成功到凭证池，失败时报告失败（累计 3 次失败后进入冷却期）
+//! - `chat_streaming()` 方法直接透传给底层 Provider（流式调用暂不支持重试）
+//!
+//! ## 与其他模块的关系
+//! - 包装了 `LlmProvider` trait 的具体实现（如 `OpenAiProvider`）
+//! - 依赖 `CredentialPool`（`credentials.rs`）进行凭证管理和负载均衡
+//! - 依赖 `RetryPolicy`（`retry.rs`）计算重试延迟
+//! - 被 `lib.rs` 重新导出为 `RetryingProvider`
+
 use crate::{ChatRequest, ChatResponse, CredentialPool, LlmProvider, ProviderError, RetryPolicy};
 use std::sync::Arc;
 use std::time::Duration;

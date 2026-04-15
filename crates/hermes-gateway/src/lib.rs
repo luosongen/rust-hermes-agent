@@ -1,3 +1,20 @@
+//! ## hermes-gateway
+//!
+//! HTTP 网关模块，负责接收各平台（Telegram、WeCom）的 Webhook 请求，
+//! 并将消息转发给 `Agent` 进行处理。
+//!
+//! ### 主要职责
+//! - 提供 HTTP 接口 `/health`、`/webhook/telegram`、`/webhook/wecom`
+//! - 管理多个平台适配器（`PlatformAdapter`），根据平台标识路由请求
+//! - 验证 Webhook 请求的合法性
+//! - 将入站消息转换为 `InboundMessage`，交由 Agent 处理后回传响应
+//!
+//! ### 请求流程
+//! ```text
+//! Webhook 请求 → 适配器验证(verify_webhook) → 解析(parse_inbound)
+//!     → Agent.run_conversation() → 发送响应(send_response)
+//! ```
+
 pub mod error;
 pub mod types;
 

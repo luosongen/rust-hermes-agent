@@ -1,3 +1,25 @@
+//! Hermes Agent CLI 主程序入口
+//!
+//! 负责解析命令行参数并分发到对应的子命令模块。
+//!
+//! ## 架构
+//! - 使用 `clap` 进行 CLI 参数解析
+//! - 使用 `tracing_subscriber` 初始化日志
+//! - 使用 `tokio` 异步运行时执行命令
+//!
+//! ## 主要子命令
+//! - `chat`: 启动交互式聊天 REPL
+//! - `model`: 管理 AI 模型（列表、设置、查看信息）
+//! - `session`: 管理会话（列表、查看、搜索、删除）
+//! - `config`: 管理配置文件
+//! - `tools`: 管理工具
+//! - `skills`: 管理技能
+//! - `gateway`: 管理网关服务
+//!
+//! ## 模块关系
+//! - `commands.rs`: 定义所有 CLI 子命令结构
+//! - `chat.rs`: 交互式聊天的 REPL 实现
+
 use clap::Parser;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 

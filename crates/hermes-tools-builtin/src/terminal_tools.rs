@@ -1,3 +1,30 @@
+//! terminal_tools — 内置终端执行工具
+//!
+//! 本模块提供 `TerminalTool`，供 AI Agent 在工作目录下执行 shell 命令。
+//!
+//! ## 主要类型
+//! - **`TerminalTool`** — 终端执行工具（名称：`terminal`）
+//!   - 参数：`command`（必填，执行的命令）、`timeout`（超时秒数，默认 30）
+//!   - 行为：使用 `tokio::process::Command` 执行命令，返回 `stdout`、`stderr`、`exit_code`
+//!   - 命令按空白字符拆分，不支持 shell 管道、重定向等复杂语法
+//!   - 执行目录为 `context.working_directory`
+//!
+//! ## 返回格式
+//! ```json
+//! {
+//!   "success": true,
+//!   "command": "ls -la",
+//!   "exit_code": 0,
+//!   "stdout": "...",
+//!   "stderr": "..."
+//! }
+//! ```
+//!
+//! ## 与其他模块的关系
+//! - 实现 `hermes_tool_registry::Tool` trait
+//! - 依赖 `hermes-core` 中的 `ToolContext`（获取工作目录）和 `ToolError`
+//! - 内部使用 `tokio::process::Command` 进行异步进程管理
+
 use async_trait::async_trait;
 use hermes_core::{ToolContext, ToolError};
 use serde_json::json;

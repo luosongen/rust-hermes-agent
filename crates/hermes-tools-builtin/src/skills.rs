@@ -1,3 +1,31 @@
+//! skills — 内置技能管理工具
+//!
+//! 本模块提供三个技能（Skill）相关工具，用于执行和搜索已注册的 Hermes 技能：
+//!
+//! ## 主要类型
+//! - **`SkillExecuteTool`** — 技能执行工具（名称：`skill_execute`）
+//!   - 参数：`name`（必填，技能名称）
+//!   - 行为：根据名称从 `SkillRegistry` 获取技能内容并返回
+//!   - 依赖 `SkillRegistry` 存储已加载的技能
+//!
+//! - **`SkillListTool`** — 技能列表工具（名称：`skill_list`）
+//!   - 参数：无
+//!   - 行为：返回所有已注册技能的名称列表，用换行分隔
+//!
+//! - **`SkillSearchTool`** — 技能搜索工具（名称：`skill_search`）
+//!   - 参数：`query`（必填，搜索关键词）
+//!   - 行为：在 `SkillRegistry` 中按名称或描述搜索，返回匹配技能的信息
+//!
+//! - **`load_skill_registry()`** — 初始化函数
+//!   - 从默认目录加载所有技能文件，构建并返回 `Arc<RwLock<SkillRegistry>>`
+//!   - 加载失败会记录警告但不影响程序继续运行
+//!
+//! ## 与其他模块的关系
+//! - 实现 `hermes_tool_registry::Tool` trait
+//! - 依赖外部 `hermes_skills` crate 提供 `SkillLoader` 和 `SkillRegistry`
+//! - `SkillRegistry` 使用 `Arc<RwLock<...>>` 共享，可在多个工具间共用同一份注册表
+//! - Agent 可通过这些工具查询和使用已注册的技能资产
+
 use async_trait::async_trait;
 use hermes_core::{ToolContext, ToolError};
 use hermes_skills::{SkillLoader, SkillRegistry};
