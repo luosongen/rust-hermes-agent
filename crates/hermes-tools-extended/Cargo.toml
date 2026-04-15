@@ -1,0 +1,19 @@
+[package]
+name = "hermes-tools-extended"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+parking_lot.workspace = true
+hermes-core.workspace = true
+hermes-tool-registry.workspace = true
+scraper.workspace = true
+regex.workspace = true
+cron.workspace = true
+urlencoding.workspace = true
