@@ -29,6 +29,7 @@ pub mod glm;
 pub mod minimax;
 pub mod kimi;
 pub mod deepseek;
+pub mod qwen;
 pub mod router;
 
 pub use traits::*;
@@ -39,4 +40,5 @@ pub use glm::GlmProvider;
 pub use minimax::MiniMaxProvider;
 pub use kimi::KimiProvider;
 pub use deepseek::DeepSeekProvider;
+pub use qwen::QwenProvider;
 pub use router::ProviderRouter;
