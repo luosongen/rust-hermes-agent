@@ -29,6 +29,7 @@ pub mod glm;
 pub mod minimax;
 pub mod kimi;
 pub mod deepseek;
+pub mod router;
 
 pub use traits::*;
 pub use openai::OpenAiProvider;
@@ -38,3 +39,4 @@ pub use glm::GlmProvider;
 pub use minimax::MiniMaxProvider;
 pub use kimi::KimiProvider;
 pub use deepseek::DeepSeekProvider;
+pub use router::ProviderRouter;
