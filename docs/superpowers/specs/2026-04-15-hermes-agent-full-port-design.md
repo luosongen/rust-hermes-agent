@@ -23,16 +23,22 @@ rust-hermes-agent 是原版 [hermes-agent](https://github.com/NousResearch/herme
 | Anthropic | Claude-3.5, Claude-3, Claude-4 系列 | ✅ 已有 |
 | OpenRouter | 200+ 模型统一入口 | ❌ 需实现 |
 | GLM (z.ai) | 智谱 AI 模型 | ❌ 需实现 |
+| MiniMax | MiniMax 海螺模型 | ❌ 需实现 |
+| Qwen (阿里云百炼) | 阿里云千问模型 | ❌ 需实现 |
 
 **子任务**:
 - [ ] `openrouter.rs` - OpenRouter Provider (统一 API，支持 200+ 模型)
 - [ ] `glm.rs` - GLM Provider (智谱 AI)
+- [ ] `minimax.rs` - MiniMax Provider (MiniMax 海螺模型)
+- [ ] `qwen.rs` - Qwen Provider (阿里云百炼)
 - [ ] 模型路由 - 根据模型名自动选择 Provider
 - [ ] Provider 池化 - 多 API Key 负载均衡
 
 **验收标准**:
 - [ ] OpenRouter Provider 编译通过，单元测试通过
 - [ ] GLM Provider 编译通过，单元测试通过
+- [ ] MiniMax Provider 编译通过，单元测试通过
+- [ ] Qwen Provider 编译通过，单元测试通过
 - [ ] 模型路由功能测试通过
 
 ---
@@ -91,18 +97,25 @@ rust-hermes-agent 是原版 [hermes-agent](https://github.com/NousResearch/herme
 
 ### Provider 架构
 ```
-┌─────────────────────────────────────────┐
-│              Agent                       │
-│  (uses LlmProvider trait)               │
-└─────────────────┬───────────────────────┘
-                  │
-    ┌─────────────┼─────────────┐
-    ▼             ▼             ▼
-OpenAiProvider  AnthropicProvider  OpenRouterProvider  GLMProvider
-    │             │             │                │
-    └─────────────┴─────────────┴────────────────┘
-                        │
-              (根据 model.provider 路由)
+┌─────────────────────────────────────────────────────┐
+│                        Agent                         │
+│              (uses LlmProvider trait)                │
+└──────────────────────────┬──────────────────────────┘
+                            │
+         ┌──────────────────┼──────────────────┐
+         ▼                  ▼                  ▼
+  ┌──────────┐      ┌──────────┐      ┌──────────┐
+  │ OpenAI   │      │Anthropic │      │OpenRouter│
+  │Provider  │      │Provider  │      │Provider  │
+  └──────────┘      └──────────┘      └──────────┘
+         │                  │                  │
+         ▼                  ▼                  ▼
+  ┌──────────┐      ┌──────────┐      ┌──────────┐
+  │   GLM    │      │ MiniMax  │      │   Qwen   │
+  │Provider  │      │Provider  │      │Provider  │
+  └──────────┘      └──────────┘      └──────────┘
+                            │
+                  (根据 model.provider 路由)
 ```
 
 ### Memory 架构
@@ -159,9 +172,16 @@ Phase 3 (Tools)   ←─── 依赖 Phase 2 的 Memory/Compression
 
 | Phase | 状态 | 进度 |
 |-------|------|------|
-| Phase 1: Providers | 进行中 | Anthropic ✅, OpenRouter ⬜, GLM ⬜ |
+| Phase 1: Providers | 进行中 | Anthropic ✅, OpenRouter ⬜, GLM ⬜, MiniMax ⬜, Qwen ⬜ |
 | Phase 2: Core | 待开始 | - |
 | Phase 3: Tools + MCP | 待开始 | - |
+
+## API 文档
+
+| Provider | API 文档 |
+|----------|----------|
+| MiniMax | https://platform.minimaxi.com/docs/api-reference/api-overview |
+| Qwen (阿里云百炼) | https://help.aliyun.com/document_detail/ |
 
 ---
 
