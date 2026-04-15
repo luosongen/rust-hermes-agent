@@ -50,8 +50,10 @@ pub mod agent;
 pub mod conversation;
 pub mod gateway;
 pub mod config;
+pub mod context_compressor;
 
 pub use credentials::CredentialPool;
+pub use context_compressor::ContextCompressor;
 pub use retrying_provider::RetryingProvider;
 pub use retry::RetryPolicy;
 
