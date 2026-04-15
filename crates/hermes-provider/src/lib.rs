@@ -24,7 +24,9 @@
 pub mod traits;
 pub mod openai;
 pub mod anthropic;
+pub mod openrouter;
 
 pub use traits::*;
 pub use openai::OpenAiProvider;
 pub use anthropic::AnthropicProvider;
+pub use openrouter::OpenRouterProvider;
