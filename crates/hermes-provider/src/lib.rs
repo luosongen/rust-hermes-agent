@@ -25,8 +25,10 @@ pub mod traits;
 pub mod openai;
 pub mod anthropic;
 pub mod openrouter;
+pub mod glm;
 
 pub use traits::*;
 pub use openai::OpenAiProvider;
 pub use anthropic::AnthropicProvider;
 pub use openrouter::OpenRouterProvider;
+pub use glm::GlmProvider;
