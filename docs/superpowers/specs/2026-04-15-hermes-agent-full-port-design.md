@@ -25,12 +25,16 @@ rust-hermes-agent 是原版 [hermes-agent](https://github.com/NousResearch/herme
 | GLM (z.ai) | 智谱 AI 模型 | ❌ 需实现 |
 | MiniMax | MiniMax 海螺模型 | ❌ 需实现 |
 | Qwen (阿里云百炼) | 阿里云千问模型 | ❌ 需实现 |
+| Kimi (Moonshot) | Kimi 模型 | ❌ 需实现 |
+| DeepSeek | DeepSeek 模型 | ❌ 需实现 |
 
 **子任务**:
 - [ ] `openrouter.rs` - OpenRouter Provider (统一 API，支持 200+ 模型)
 - [ ] `glm.rs` - GLM Provider (智谱 AI)
 - [ ] `minimax.rs` - MiniMax Provider (MiniMax 海螺模型)
 - [ ] `qwen.rs` - Qwen Provider (阿里云百炼)
+- [ ] `kimi.rs` - Kimi Provider (Moonshot AI)
+- [ ] `deepseek.rs` - DeepSeek Provider
 - [ ] 模型路由 - 根据模型名自动选择 Provider
 - [ ] Provider 池化 - 多 API Key 负载均衡
 
@@ -39,6 +43,8 @@ rust-hermes-agent 是原版 [hermes-agent](https://github.com/NousResearch/herme
 - [ ] GLM Provider 编译通过，单元测试通过
 - [ ] MiniMax Provider 编译通过，单元测试通过
 - [ ] Qwen Provider 编译通过，单元测试通过
+- [ ] Kimi Provider 编译通过，单元测试通过
+- [ ] DeepSeek Provider 编译通过，单元测试通过
 - [ ] 模型路由功能测试通过
 
 ---
@@ -97,25 +103,31 @@ rust-hermes-agent 是原版 [hermes-agent](https://github.com/NousResearch/herme
 
 ### Provider 架构
 ```
-┌─────────────────────────────────────────────────────┐
-│                        Agent                         │
-│              (uses LlmProvider trait)                │
-└──────────────────────────┬──────────────────────────┘
-                            │
-         ┌──────────────────┼──────────────────┐
-         ▼                  ▼                  ▼
-  ┌──────────┐      ┌──────────┐      ┌──────────┐
-  │ OpenAI   │      │Anthropic │      │OpenRouter│
-  │Provider  │      │Provider  │      │Provider  │
-  └──────────┘      └──────────┘      └──────────┘
-         │                  │                  │
-         ▼                  ▼                  ▼
-  ┌──────────┐      ┌──────────┐      ┌──────────┐
-  │   GLM    │      │ MiniMax  │      │   Qwen   │
-  │Provider  │      │Provider  │      │Provider  │
-  └──────────┘      └──────────┘      └──────────┘
-                            │
-                  (根据 model.provider 路由)
+┌─────────────────────────────────────────────────────────────┐
+│                           Agent                              │
+│                    (uses LlmProvider trait)                    │
+└─────────────────────────────┬───────────────────────────────┘
+                                │
+              ┌─────────────────┼─────────────────┐
+              ▼                 ▼                 ▼
+       ┌──────────┐     ┌──────────┐     ┌──────────┐
+       │  OpenAI  │     │Anthropic │     │OpenRouter│
+       │ Provider │     │ Provider │     │ Provider │
+       └──────────┘     └──────────┘     └──────────┘
+              │                 │                 │
+              ▼                 ▼                 ▼
+       ┌──────────┐     ┌──────────┐     ┌──────────┐
+       │   GLM    │     │ MiniMax  │     │   Qwen   │
+       │ Provider │     │ Provider │     │ Provider │
+       └──────────┘     └──────────┘     └──────────┘
+              │                 │                 │
+              ▼                 ▼                 ▼
+       ┌──────────┐     ┌──────────┐     ┌──────────┐
+       │   Kimi   │     │ DeepSeek │     │   ...    │
+       │ Provider │     │ Provider │     │          │
+       └──────────┘     └──────────┘     └──────────┘
+                                │
+                      (根据 model.provider 路由)
 ```
 
 ### Memory 架构
@@ -172,7 +184,7 @@ Phase 3 (Tools)   ←─── 依赖 Phase 2 的 Memory/Compression
 
 | Phase | 状态 | 进度 |
 |-------|------|------|
-| Phase 1: Providers | 进行中 | Anthropic ✅, OpenRouter ⬜, GLM ⬜, MiniMax ⬜, Qwen ⬜ |
+| Phase 1: Providers | 进行中 | Anthropic ✅, OpenRouter ⬜, GLM ⬜, MiniMax ⬜, Qwen ⬜, Kimi ⬜, DeepSeek ⬜ |
 | Phase 2: Core | 待开始 | - |
 | Phase 3: Tools + MCP | 待开始 | - |
 
