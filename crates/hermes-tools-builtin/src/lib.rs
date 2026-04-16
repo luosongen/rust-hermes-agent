@@ -36,12 +36,17 @@ pub mod terminal_tools;
 pub mod todo_tools;
 /// 用户交互工具模块
 pub mod clarify_tools;
+/// 危险命令审批工具模块
+pub mod approval_tools;
 
 pub use file_tools::{ReadFileTool, WriteFileTool};
 pub use skills::{load_skill_registry, SkillExecuteTool, SkillListTool, SkillSearchTool};
 pub use terminal_tools::TerminalTool;
 pub use todo_tools::{TodoStore, TodoTool};
 pub use clarify_tools::ClarifyTool;
+pub use approval_tools::{ApprovalStore, ApprovalTool};
+
+use std::path::PathBuf;
 
 use hermes_tool_registry::ToolRegistry;
 
@@ -58,4 +63,6 @@ pub fn register_builtin_tools(registry: &ToolRegistry) {
     registry.register(WriteFileTool::new());
     registry.register(TerminalTool::new());
     registry.register(TodoTool::new());
+    let config_dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("~/.config/hermes-agent"));
+    registry.register(ApprovalTool::new(config_dir));
 }
