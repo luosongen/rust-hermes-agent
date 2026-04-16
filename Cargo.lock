@@ -1094,6 +1094,7 @@ dependencies = [
  "hermes-core",
  "hermes-skills",
  "hermes-tool-registry",
+ "once_cell",
  "parking_lot",
  "regex",
  "reqwest",
@@ -1101,6 +1102,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
+ "toml",
  "tracing",
 ]
 
