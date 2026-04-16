@@ -47,7 +47,11 @@ pub use terminal_tools::TerminalTool;
 pub use todo_tools::{TodoStore, TodoTool};
 pub use clarify_tools::ClarifyTool;
 pub use approval_tools::{ApprovalStore, ApprovalTool};
-pub use browser_tools::{BrowserSessionStore, BrowserToolCore};
+pub use browser_tools::{
+    BrowserSessionStore, BrowserToolCore,
+    BrowserNavigateTool, BrowserSnapshotTool, BrowserClickTool,
+    BrowserTypeTool, BrowserScrollTool, BrowserBackTool, BrowserPressTool,
+};
 
 use std::path::PathBuf;
 
