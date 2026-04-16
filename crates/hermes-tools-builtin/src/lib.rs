@@ -6,6 +6,7 @@
 //! - **`file_tools`** — 文件读写工具：`ReadFileTool`、`WriteFileTool`
 //! - **`terminal_tools`** — 终端执行工具：`TerminalTool`
 //! - **`skills`** — 技能管理工具：`SkillExecuteTool`、`SkillListTool`、`SkillSearchTool`
+//! - **`browser_tools`** — 浏览器自动化工具：`BrowserNavigateTool`、`BrowserSnapshotTool` 等
 //!
 //! ## 主要类型
 //! - **`ReadFileTool`** — 按路径读取文件内容，支持偏移量和行数限制
@@ -14,6 +15,14 @@
 //! - **`SkillExecuteTool`** — 根据名称执行已注册的 Hermes 技能
 //! - **`SkillListTool`** — 列出所有可用的技能名称
 //! - **`SkillSearchTool`** — 按名称或描述搜索技能
+//! - **`BrowserNavigateTool`** — 浏览器导航（通过 agent-browser CLI）
+//! - **`BrowserSnapshotTool`** — 获取页面可访问性快照
+//! - **`BrowserClickTool`** — 点击页面元素
+//! - **`BrowserTypeTool`** — 向输入框填写文本
+//! - **`BrowserScrollTool`** — 滚动页面
+//! - **`BrowserBackTool`** — 浏览器后退
+//! - **`BrowserPressTool`** — 键盘按键
+//! - **`BrowserVisionTool`** — 页面截图（Vision AI 分析待集成）
 //!
 //! ## 与其他模块的关系
 //! - 依赖 `hermes-tool-registry` 中的 `Tool` trait 和 `ToolRegistry`
@@ -51,6 +60,7 @@ pub use browser_tools::{
     BrowserSessionStore, BrowserToolCore,
     BrowserNavigateTool, BrowserSnapshotTool, BrowserClickTool,
     BrowserTypeTool, BrowserScrollTool, BrowserBackTool, BrowserPressTool,
+    BrowserVisionTool,
 };
 
 use std::path::PathBuf;
@@ -71,5 +81,16 @@ pub fn register_builtin_tools(registry: &ToolRegistry) {
     registry.register(TerminalTool::new());
     registry.register(TodoTool::new());
     let config_dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("~/.config/hermes-agent"));
-    registry.register(ApprovalTool::new(config_dir));
+    registry.register(ApprovalTool::new(config_dir.clone()));
+    // Browser tools
+    let browser_core = browser_tools::BrowserToolCore::new(config_dir.clone());
+    registry.register(BrowserNavigateTool::new(browser_core.clone()));
+    registry.register(BrowserSnapshotTool::new(browser_core.clone()));
+    registry.register(BrowserClickTool::new(browser_core.clone()));
+    registry.register(BrowserTypeTool::new(browser_core.clone()));
+    registry.register(BrowserScrollTool::new(browser_core.clone()));
+    registry.register(BrowserBackTool::new(browser_core.clone()));
+    registry.register(BrowserPressTool::new(browser_core.clone()));
+    registry.register(BrowserVisionTool::new(browser_core.clone()));
+    browser_core.start_cleanup();
 }

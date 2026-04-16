@@ -139,6 +139,43 @@ impl BrowserToolCore {
             config_dir,
         }
     }
+
+    /// Start the background cleanup task. Call once after core is created,
+    /// inside a Tokio runtime. Tests skip this since they have no runtime.
+    pub fn start_cleanup(&self) {
+        let store = Arc::clone(&self.store);
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                let stale = {
+                    let store = store.read();
+                    store.get_stale_sessions()
+                };
+                if !stale.is_empty() {
+                    let sessions_to_close: Vec<(String, String)> = {
+                        let store = store.read();
+                        stale
+                            .into_iter()
+                            .filter_map(|task_id| {
+                                store.task_session_map.get(&task_id).cloned().map(|name| (task_id, name))
+                            })
+                            .collect()
+                    };
+                    for (task_id, session_name) in sessions_to_close {
+                        let _ = tokio::process::Command::new("agent-browser")
+                            .arg("--session")
+                            .arg(&session_name)
+                            .arg("--json")
+                            .arg("close")
+                            .output()
+                            .await;
+                        let mut store = store.write();
+                        store.remove_session(&task_id);
+                    }
+                }
+            }
+        });
+    }
 }
 
 impl Clone for BrowserToolCore {
@@ -607,6 +644,14 @@ pub struct PressParams {
     pub key: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VisionParams {
+    pub question: String,
+    #[serde(default)]
+    pub annotate: bool,
+}
+
 #[async_trait]
 impl Tool for BrowserPressTool {
     fn name(&self) -> &str {
@@ -631,5 +676,78 @@ impl Tool for BrowserPressTool {
             .run_command(&context.session_id, "press", vec![&params.key], 30)
             .await?;
         Ok(json!({ "success": true, "pressed": params.key }).to_string())
+    }
+}
+
+// === browser_vision ===
+
+pub struct BrowserVisionTool {
+    pub core: BrowserToolCore,
+}
+
+impl BrowserVisionTool {
+    pub fn new(core: BrowserToolCore) -> Self {
+        Self { core }
+    }
+}
+
+impl Clone for BrowserVisionTool {
+    fn clone(&self) -> Self {
+        Self { core: self.core.clone() }
+    }
+}
+
+impl std::fmt::Debug for BrowserVisionTool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BrowserVisionTool").finish()
+    }
+}
+
+#[async_trait]
+impl Tool for BrowserVisionTool {
+    fn name(&self) -> &str {
+        "browser_vision"
+    }
+    fn description(&self) -> &str {
+        "Take screenshot and analyze with vision AI."
+    }
+    fn parameters(&self) -> serde_json::Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "question": { "type": "string" },
+                "annotate": { "type": "boolean", "default": false }
+            },
+            "required": ["question"]
+        })
+    }
+    async fn execute(&self, args: serde_json::Value, context: ToolContext) -> Result<String, ToolError> {
+        let params: VisionParams =
+            serde_json::from_value(args).map_err(|e| ToolError::InvalidArgs(e.to_string()))?;
+
+        let screenshot_dir = std::env::temp_dir().join("hermes-screenshots");
+        std::fs::create_dir_all(&screenshot_dir).ok();
+        let screenshot_path = screenshot_dir.join(format!("browser_{}.png", Uuid::new_v4()));
+
+        let mut screenshot_args = vec![];
+        if params.annotate {
+            screenshot_args.push("--annotate");
+        }
+        screenshot_args.push("--full");
+        screenshot_args.push(screenshot_path.to_str().unwrap());
+
+        self.core
+            .run_command(&context.session_id, "screenshot", screenshot_args, 60)
+            .await?;
+
+        if !screenshot_path.exists() {
+            return Err(ToolError::Execution("Screenshot file not created".into()));
+        }
+
+        Ok(json!({
+            "success": true,
+            "screenshot_path": screenshot_path.to_str().unwrap_or(""),
+            "analysis": "Screenshot captured. Vision analysis not yet integrated."
+        }).to_string())
     }
 }

@@ -3,7 +3,9 @@ use hermes_tools_builtin::browser_tools::{
     BrowserSessionStore, BrowserToolCore,
     BrowserNavigateTool, BrowserSnapshotTool, BrowserClickTool,
     BrowserTypeTool, BrowserScrollTool, BrowserBackTool, BrowserPressTool,
+    BrowserVisionTool,
     NavigateParams, SnapshotParams, ClickParams, TypeParams, ScrollParams, PressParams,
+    VisionParams,
 };
 use std::path::PathBuf;
 
@@ -188,4 +190,26 @@ fn test_browser_press_params_requires_key() {
     let params = serde_json::json!({});
     let result = serde_json::from_value::<PressParams>(params);
     assert!(result.is_err()); // key is required
+}
+
+#[test]
+fn test_browser_vision_tool_name() {
+    let core = make_core();
+    let tool = BrowserVisionTool::new(core);
+    assert_eq!(tool.name(), "browser_vision");
+}
+
+#[test]
+fn test_browser_vision_params_parsing() {
+    let params = serde_json::json!({"question": "What is on the page?"});
+    let result = serde_json::from_value::<VisionParams>(params);
+    assert!(result.is_ok());
+    let params_parsed = result.as_ref().unwrap();
+    assert_eq!(params_parsed.question, "What is on the page?");
+    assert_eq!(params_parsed.annotate, false);
+
+    let params_with_annotate = serde_json::json!({"question": "What is on the page?", "annotate": true});
+    let result2 = serde_json::from_value::<VisionParams>(params_with_annotate);
+    assert!(result2.is_ok());
+    assert!(result2.unwrap().annotate);
 }
