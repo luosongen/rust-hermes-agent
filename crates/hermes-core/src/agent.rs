@@ -71,6 +71,11 @@ impl Agent {
         &self.config
     }
 
+    /// Returns a reference to the tool dispatcher.
+    pub fn tools(&self) -> Arc<dyn ToolDispatcher> {
+        Arc::clone(&self.tools)
+    }
+
     pub fn new(
         provider: Arc<dyn LlmProvider>,
         tools: Arc<dyn ToolDispatcher>,

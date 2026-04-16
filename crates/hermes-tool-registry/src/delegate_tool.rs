@@ -1,18 +1,13 @@
 //! DelegateTool — spawns subagents to handle tasks in parallel.
-//!
-////! Lives in `hermes-tool-registry` because it implements the `Tool` trait
-//! (defined there), which `hermes-core` cannot depend on due to a circular
-//! dependency. The delegation types (`DelegateParams`, `DelegateTask`, etc.)
-//! live in `hermes-core::delegate::types`.
 
 use async_trait::async_trait;
 use hermes_core::{
     Agent, AgentConfig, ChatRequest, ConversationResponse, FinishReason,
-    Message, ModelId, ToolContext, ToolError,
+    Message, ModelId, ToolContext, ToolDefinition, ToolError,
 };
 use hermes_core::delegate::types::{
     BatchDelegateResult, DelegateParams, DelegateResult, DelegateStatus, DelegateTask,
-    DEFAULT_MAX_CONCURRENT, MAX_DELEGATION_DEPTH,
+    DEFAULT_MAX_CONCURRENT, BLOCKED_TOOLS, MAX_DELEGATION_DEPTH,
 };
 use crate::Tool;
 use std::sync::Arc;
@@ -42,6 +37,31 @@ impl DelegateTool {
         }
     }
 
+    /// Filter tool definitions by name prefix and strip blocked tools.
+    fn filter_tools(&self, toolsets: Option<&[String]>) -> Option<Vec<ToolDefinition>> {
+        let all_tools = self.parent_agent.tools().get_definitions();
+
+        // If no toolsets specified, use all non-blocked tools
+        let filtered: Vec<ToolDefinition> = if let Some(names) = toolsets {
+            all_tools
+                .into_iter()
+                .filter(|t| names.iter().any(|n| t.name == *n || t.name.starts_with(&format!("{}.", n))))
+                .filter(|t| !BLOCKED_TOOLS.iter().any(|&b| t.name == b || t.name.starts_with(&format!("{}.", b))))
+                .collect()
+        } else {
+            all_tools
+                .into_iter()
+                .filter(|t| !BLOCKED_TOOLS.iter().any(|&b| t.name == b || t.name.starts_with(&format!("{}.", b))))
+                .collect()
+        };
+
+        if filtered.is_empty() {
+            None
+        } else {
+            Some(filtered)
+        }
+    }
+
     async fn run_single_child(&self, task: DelegateTask, parent_depth: u8) -> DelegateResult {
         let start = Instant::now();
 
@@ -67,8 +87,10 @@ impl DelegateTool {
             working_directory: self.parent_agent.config().working_directory.clone(),
         };
 
+        let tools = self.filter_tools(task.toolsets.as_deref());
+
         let result = self
-            .spawn_child_agent(&child_config, &child_prompt, parent_depth + 1)
+            .spawn_child_agent(&child_config, &child_prompt, parent_depth + 1, tools)
             .await;
         let duration_ms = start.elapsed().as_millis() as u64;
 
@@ -112,6 +134,7 @@ impl DelegateTool {
         config: &AgentConfig,
         system_prompt: &str,
         _depth: u8,
+        tools: Option<Vec<ToolDefinition>>,
     ) -> Result<(ConversationResponse, u32), ToolError> {
         let mut messages = vec![Message::user(system_prompt.to_string())];
         let mut api_calls = 0u32;
@@ -128,7 +151,7 @@ impl DelegateTool {
             let chat_request = ChatRequest {
                 model: model_id,
                 messages: messages.clone(),
-                tools: None,
+                tools: tools.clone(),
                 system_prompt: None,
                 temperature: config.temperature,
                 max_tokens: config.max_tokens,
@@ -178,7 +201,8 @@ impl DelegateTool {
             let depth = parent_depth;
 
             handles.push(tokio::spawn(async move {
-                let _permit = sem.acquire_owned().await.unwrap();
+                let _permit = sem.acquire_owned().await
+                    .map_err(|_| ToolError::Execution("Semaphore closed".into())).unwrap();
                 tool.run_single_child(task, depth).await
             }));
         }

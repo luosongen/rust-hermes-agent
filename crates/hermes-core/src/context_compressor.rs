@@ -360,16 +360,7 @@ impl ContextCompressor {
         self.align_boundary_backward(messages, cut_idx)
     }
 
-    /// 将边界向前推过孤立的工具结果
-    fn align_boundary_forward(&self, messages: &[Message], idx: usize) -> usize {
-        let mut idx = idx;
-        while idx < messages.len() && messages[idx].role == Role::Tool {
-            idx += 1;
-        }
-        idx
-    }
-
-    /// 将边界向后拉以避免拆分工具调用/结果组
+        /// 将边界向后拉以避免拆分工具调用/结果组
     fn align_boundary_backward(&self, messages: &[Message], idx: usize) -> usize {
         if idx <= 0 || idx >= messages.len() {
             return idx;
