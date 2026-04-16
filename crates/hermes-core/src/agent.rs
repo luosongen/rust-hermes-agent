@@ -61,6 +61,16 @@ pub struct Agent {
 }
 
 impl Agent {
+    /// Returns a reference to the LLM provider.
+    pub fn provider(&self) -> Arc<dyn LlmProvider> {
+        Arc::clone(&self.provider)
+    }
+
+    /// Returns a reference to the agent config.
+    pub fn config(&self) -> &AgentConfig {
+        &self.config
+    }
+
     pub fn new(
         provider: Arc<dyn LlmProvider>,
         tools: Arc<dyn ToolDispatcher>,

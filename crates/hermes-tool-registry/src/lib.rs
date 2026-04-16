@@ -25,5 +25,7 @@
 //! ```
 
 pub mod registry;
+pub mod delegate_tool;
 
 pub use registry::*;
+pub use delegate_tool::DelegateTool;
