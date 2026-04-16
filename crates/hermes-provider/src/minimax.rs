@@ -5,19 +5,48 @@ use reqwest::Client;
 use std::collections::HashMap;
 
 // =============================================================================
-// MiniMax Provider
+// MiniMax (海螺 AI) Provider 实现
 // =============================================================================
 //
-// API: https://api.minimax.chat/v1
-// MiniMax is OpenAI-compatible
+// 该模块实现了 [`crate::traits::LlmProvider`] trait，提供了与 MiniMax 海螺 AI API 的交互能力。
 //
-// Authentication: API Key in Authorization header (Bearer prefix)
-// Base URL: https://api.minimax.chat/v1/chat/completions
+// ## API 特性
+// - API 文档：https://api.minimax.chat/v1
+// - 认证方式：API Key 放在 Authorization header 中（Bearer 前缀）
+// - 基础地址：https://api.minimax.chat/v1/chat/completions
+// - 兼容性：MiniMax 采用 OpenAI 兼容的 API 格式
+//
+// ## 请求转换
+//
+// [`convert_request`] 负责将通用的 `ChatRequest` 转换为 MiniMax API 的请求格式：
+// - 将 `Role` 枚举映射为角色字符串（"system"、"user"、"assistant"、"tool"）
+// - 将 `Content` 类型映射为消息内容（支持文本、图片 URL、工具结果）
+// - 将系统提示词作为首条 system 消息插入
+// - 将工具定义转换为 OpenAI 的 function calling 格式
+//
+// ## 响应转换
+//
+// [`convert_response`] 负责将 MiniMax API 的响应转换为通用的 `ChatResponse`：
+// - 提取消息内容
+// - 解析 finish_reason（如 "stop"、"length"）
+// - 将工具调用（tool_calls）转换为统一的 `ToolCall` 结构
+// - 提取 token 使用量统计
+//
+// ## 支持的模型
+//
+// - `minimax/MiniMax-Text-01` - 1M 上下文窗口
+// - `minimax/hailuo-02` - 128K 上下文窗口
+//
+// ## 流式输出
+//
+// [`chat_streaming`] 方法当前返回 `Err(ProviderError::Api("Streaming not yet implemented"))`，
+// 表示流式输出功能尚未实现。
 
 // =============================================================================
-// Request/Response Types
+// 请求/响应类型定义
 // =============================================================================
 
+/// MiniMax API 请求结构
 #[derive(Serialize)]
 struct MiniMaxRequest {
     model: String,
@@ -31,12 +60,14 @@ struct MiniMaxRequest {
     stream: bool,
 }
 
+/// MiniMax 消息结构
 #[derive(Serialize)]
 struct MiniMaxMessage {
     role: String,
     content: String,
 }
 
+/// MiniMax API 响应结构
 #[derive(Deserialize)]
 struct MiniMaxResponse {
     #[allow(dead_code)]
@@ -45,12 +76,14 @@ struct MiniMaxResponse {
     usage: Option<MiniMaxUsage>,
 }
 
+/// MiniMax 响应选项
 #[derive(Deserialize)]
 struct MiniMaxChoice {
     message: MiniMaxResponseMessage,
     finish_reason: Option<String>,
 }
 
+/// MiniMax 响应消息内容
 #[derive(Deserialize)]
 struct MiniMaxResponseMessage {
     #[allow(dead_code)]
@@ -60,6 +93,7 @@ struct MiniMaxResponseMessage {
     tool_calls: Option<Vec<MiniMaxToolCall>>,
 }
 
+/// MiniMax Token 使用量统计
 #[derive(Deserialize)]
 struct MiniMaxUsage {
     prompt_tokens: usize,
@@ -68,6 +102,7 @@ struct MiniMaxUsage {
     total_tokens: usize,
 }
 
+/// MiniMax 工具定义结构
 #[derive(Serialize)]
 struct MiniMaxTool {
     #[serde(rename = "type")]
@@ -75,6 +110,7 @@ struct MiniMaxTool {
     function: MiniMaxFunction,
 }
 
+/// MiniMax 函数定义
 #[derive(Serialize)]
 struct MiniMaxFunction {
     name: String,
@@ -82,6 +118,7 @@ struct MiniMaxFunction {
     parameters: serde_json::Value,
 }
 
+/// MiniMax 工具调用请求
 #[derive(Deserialize)]
 struct MiniMaxToolCall {
     id: String,
@@ -89,6 +126,7 @@ struct MiniMaxToolCall {
     function: MiniMaxFunctionCall,
 }
 
+/// MiniMax 函数调用详情
 #[derive(Deserialize)]
 struct MiniMaxFunctionCall {
     name: String,
@@ -96,15 +134,22 @@ struct MiniMaxFunctionCall {
 }
 
 // =============================================================================
-// MiniMaxProvider
+// MiniMaxProvider 定义
 // =============================================================================
 
+/// MiniMax 海螺 AI API 提供者
+///
+/// 使用 MiniMax Chat Completions API 与 LLM 交互。
+/// MiniMax API 与 OpenAI 兼容，支持函数调用等功能。
 pub struct MiniMaxProvider {
+    /// HTTP 客户端
     client: Client,
+    /// API 密钥
     api_key: String,
 }
 
 impl MiniMaxProvider {
+    /// 创建新的 MiniMax Provider 实例
     pub fn new(api_key: impl Into<String>) -> Self {
         Self {
             client: Client::new(),
@@ -114,9 +159,10 @@ impl MiniMaxProvider {
 }
 
 // =============================================================================
-// Helper Functions
+// 辅助函数
 // =============================================================================
 
+/// 将 hermes-core 的 Message 列表转换为 MiniMax API 的消息格式
 fn convert_messages(messages: &[hermes_core::Message]) -> Vec<MiniMaxMessage> {
     use hermes_core::{Content, Role};
 

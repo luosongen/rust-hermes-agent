@@ -26,8 +26,11 @@
 //! - `TerminalTool` 仅支持简单命令拆分，不支持 shell 管道和复杂语法
 //! - 所有工具都基于 `ToolContext` 中的 `working_directory` 做相对路径解析
 
+/// 文件读写工具模块
 pub mod file_tools;
+/// 技能管理工具模块
 pub mod skills;
+/// 终端执行工具模块
 pub mod terminal_tools;
 
 pub use file_tools::{ReadFileTool, WriteFileTool};
@@ -36,6 +39,14 @@ pub use terminal_tools::TerminalTool;
 
 use hermes_tool_registry::ToolRegistry;
 
+/// 将所有内置工具注册到传入的 ToolRegistry
+///
+/// 注册的工具包括：
+/// - `ReadFileTool` - 文件读取工具
+/// - `WriteFileTool` - 文件写入工具
+/// - `TerminalTool` - 终端执行工具
+///
+/// 注意：技能相关工具需要单独创建并注册（依赖 SkillRegistry）
 pub fn register_builtin_tools(registry: &ToolRegistry) {
     registry.register(ReadFileTool::new());
     registry.register(WriteFileTool::new());

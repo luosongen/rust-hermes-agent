@@ -30,9 +30,24 @@ use hermes_core::{ToolContext, ToolError};
 use serde_json::json;
 use std::process::Stdio;
 
+/// 终端命令执行工具
+///
+/// 在工作目录下执行 shell 命令并返回输出结果。
+///
+/// # 工具参数
+/// - `command`（必填）：要执行的命令
+/// - `timeout`（可选）：超时时间（秒），默认 30
+///
+/// # 返回格式
+/// JSON 包含 `success`、`command`、`exit_code`、`stdout`、`stderr`
+///
+/// # 安全说明
+/// - 命令按空白字符拆分，不支持 shell 管道、重定向等复杂语法
+/// - 相对路径基于 `context.working_directory` 解析
 pub struct TerminalTool;
 
 impl TerminalTool {
+    /// 创建新的 TerminalTool 实例
     pub fn new() -> Self {
         Self
     }

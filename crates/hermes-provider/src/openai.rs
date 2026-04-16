@@ -45,93 +45,149 @@ use reqwest::Client;
 // 表示流式输出功能尚未实现。
 
 // =============================================================================
-// OpenAI API Request/Response Types
+// OpenAI API 请求/响应类型定义
 // =============================================================================
 
+/// OpenAI Chat Completions API 请求结构
 #[derive(Serialize)]
 struct OpenAiRequest {
+    /// 模型标识符（如 "gpt-4o"）
     model: String,
+    /// 消息列表
     messages: Vec<OpenAiMessage>,
+    /// 可选的工具定义列表（OpenAI function calling）
     #[serde(skip_serializing_if = "Option::is_none")]
     tools: Option<Vec<OpenAiTool>>,
+    /// 可选的温度参数（控制随机性）
     #[serde(skip_serializing_if = "Option::is_none")]
     temperature: Option<f32>,
+    /// 可选的最大 token 数限制
     #[serde(skip_serializing_if = "Option::is_none")]
     max_tokens: Option<usize>,
+    /// 是否启用流式输出
     stream: bool,
 }
 
+/// OpenAI 消息结构（与 Role 对应：system/user/assistant/tool）
 #[derive(Serialize)]
 struct OpenAiMessage {
+    /// 角色（"system"、"user"、"assistant"、"tool"）
     role: String,
+    /// 消息内容
     content: String,
 }
 
+/// OpenAI 工具定义结构
 #[derive(Serialize)]
 struct OpenAiTool {
+    /// 工具类型，固定为 "function"
     #[serde(rename = "type")]
     tool_type: String,
+    /// 函数定义
     function: OpenAiFunction,
 }
 
+/// OpenAI 函数定义
 #[derive(Serialize)]
 struct OpenAiFunction {
+    /// 函数名称
     name: String,
+    /// 函数描述
     description: String,
+    /// 函数参数 JSON Schema
     parameters: serde_json::Value,
 }
 
+/// OpenAI API 响应结构
 #[derive(Deserialize, Debug)]
 struct OpenAiResponse {
+    /// 响应选项列表（通常取第一个）
     choices: Vec<OpenAiChoice>,
+    /// Token 使用量统计
     usage: Option<OpenAiUsage>,
 }
 
+/// OpenAI 响应选项
 #[derive(Deserialize, Debug)]
 struct OpenAiChoice {
+    /// 响应消息
     message: OpenAiChoiceMessage,
+    /// 结束原因（"stop"、"length"、"content_filter"）
     finish_reason: Option<String>,
 }
 
+/// OpenAI 响应消息内容
 #[derive(Deserialize, Debug)]
 struct OpenAiChoiceMessage {
+    /// 角色（通常为 "assistant"）
     role: String,
+    /// 消息文本内容
     content: String,
+    /// 工具调用列表（如有）
     #[serde(default)]
     tool_calls: Option<Vec<OpenAiToolCall>>,
 }
 
+/// OpenAI 工具调用请求
 #[derive(Deserialize, Debug)]
 struct OpenAiToolCall {
+    /// 工具调用 ID
     id: String,
+    /// 被调用的函数
     #[serde(rename = "function")]
     function: OpenAiFunctionCall,
 }
 
+/// OpenAI 函数调用详情
 #[derive(Deserialize, Debug)]
 struct OpenAiFunctionCall {
+    /// 要调用的函数名称
     name: String,
+    /// 函数参数（JSON 字符串，需要额外解析）
     arguments: String,
 }
 
+/// OpenAI Token 使用量统计
 #[derive(Deserialize, Debug)]
 struct OpenAiUsage {
+    /// 输入 token 数
     prompt_tokens: usize,
+    /// 输出 token 数
     completion_tokens: usize,
+    /// 总 token 数
     total_tokens: usize,
 }
 
 // =============================================================================
-// OpenAiProvider
+// OpenAiProvider 定义
 // =============================================================================
 
+/// OpenAI API 提供者
+///
+/// 使用 OpenAI Chat Completions API 与 LLM 交互。
+/// 支持函数调用（function calling）、系统提示词、温度和 token 限制等参数。
+///
+/// # 示例
+///
+/// ```
+/// use hermes_provider::OpenAiProvider;
+///
+/// let provider = OpenAiProvider::new("sk-...", None);
+/// ```
 pub struct OpenAiProvider {
+    /// HTTP 客户端
     client: Client,
+    /// API 基础地址（默认 https://api.openai.com/v1）
     base_url: String,
+    /// API 密钥
     api_key: String,
 }
 
 impl OpenAiProvider {
+    /// 创建新的 OpenAI Provider 实例
+    ///
+    /// - `api_key`：OpenAI API 密钥
+    /// - `base_url`：可选的自定义 API 基础地址（如需使用代理）
     pub fn new(api_key: impl Into<String>, base_url: Option<String>) -> Self {
         Self {
             client: Client::new(),
@@ -140,6 +196,7 @@ impl OpenAiProvider {
         }
     }
 
+    /// 将通用的 ChatRequest 转换为 OpenAI API 请求格式
     fn convert_request(&self, request: ChatRequest) -> OpenAiRequest {
         use hermes_core::{Content, Role};
 
@@ -199,6 +256,7 @@ impl OpenAiProvider {
         }
     }
 
+    /// 将 OpenAI API 响应转换为通用的 ChatResponse
     fn convert_response(&self, response: OpenAiResponse) -> Result<hermes_core::ChatResponse, ProviderError> {
         use hermes_core::{ChatResponse, FinishReason, ToolCall, Usage};
         use std::collections::HashMap;

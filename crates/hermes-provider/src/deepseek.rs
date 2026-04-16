@@ -5,19 +5,48 @@ use reqwest::Client;
 use std::collections::HashMap;
 
 // =============================================================================
-// DeepSeek Provider
+// DeepSeek Provider 实现
 // =============================================================================
 //
-// API: https://api.deepseek.com/v1
-// DeepSeek is OpenAI-compatible
+// 该模块实现了 [`crate::traits::LlmProvider`] trait，提供了与 DeepSeek API 的交互能力。
 //
-// Authentication: API Key in Authorization header (Bearer prefix)
-// Base URL: https://api.deepseek.com/v1/chat/completions
+// ## API 特性
+// - API 文档：https://api.deepseek.com/v1
+// - 认证方式：API Key 放在 Authorization header 中（Bearer 前缀）
+// - 基础地址：https://api.deepseek.com/v1/chat/completions
+// - 兼容性：DeepSeek 采用 OpenAI 兼容的 API 格式
+//
+// ## 请求转换
+//
+// [`convert_request`] 负责将通用的 `ChatRequest` 转换为 DeepSeek API 的请求格式：
+// - 将 `Role` 枚举映射为角色字符串（"system"、"user"、"assistant"、"tool"）
+// - 将 `Content` 类型映射为消息内容（支持文本、图片 URL、工具结果）
+// - 将系统提示词作为首条 system 消息插入
+// - 将工具定义转换为 OpenAI 的 function calling 格式
+//
+// ## 响应转换
+//
+// [`convert_response`] 负责将 DeepSeek API 的响应转换为通用的 `ChatResponse`：
+// - 提取消息内容
+// - 解析 finish_reason（如 "stop"、"length"）
+// - 将工具调用（tool_calls）转换为统一的 `ToolCall` 结构
+// - 提取 token 使用量统计
+//
+// ## 支持的模型
+//
+// - `deepseek/deepseek-chat` - 64K 上下文窗口
+// - `deepseek/deepseek-coder` - 64K 上下文窗口（代码专用）
+//
+// ## 流式输出
+//
+// [`chat_streaming`] 方法当前返回 `Err(ProviderError::Api("Streaming not yet implemented"))`，
+// 表示流式输出功能尚未实现。
 
 // =============================================================================
-// Request/Response Types
+// 请求/响应类型定义
 // =============================================================================
 
+/// DeepSeek API 请求结构
 #[derive(Serialize)]
 struct DeepSeekRequest {
     model: String,
@@ -31,12 +60,14 @@ struct DeepSeekRequest {
     stream: bool,
 }
 
+/// DeepSeek 消息结构
 #[derive(Serialize)]
 struct DeepSeekMessage {
     role: String,
     content: String,
 }
 
+/// DeepSeek API 响应结构
 #[derive(Deserialize)]
 struct DeepSeekResponse {
     #[allow(dead_code)]
@@ -45,12 +76,14 @@ struct DeepSeekResponse {
     usage: Option<DeepSeekUsage>,
 }
 
+/// DeepSeek 响应选项
 #[derive(Deserialize)]
 struct DeepSeekChoice {
     message: DeepSeekResponseMessage,
     finish_reason: Option<String>,
 }
 
+/// DeepSeek 响应消息内容
 #[derive(Deserialize)]
 struct DeepSeekResponseMessage {
     #[allow(dead_code)]
@@ -60,6 +93,7 @@ struct DeepSeekResponseMessage {
     tool_calls: Option<Vec<DeepSeekToolCall>>,
 }
 
+/// DeepSeek Token 使用量统计
 #[derive(Deserialize)]
 struct DeepSeekUsage {
     prompt_tokens: usize,
@@ -68,6 +102,7 @@ struct DeepSeekUsage {
     total_tokens: usize,
 }
 
+/// DeepSeek 工具定义结构
 #[derive(Serialize)]
 struct DeepSeekTool {
     #[serde(rename = "type")]
@@ -75,6 +110,7 @@ struct DeepSeekTool {
     function: DeepSeekFunction,
 }
 
+/// DeepSeek 函数定义
 #[derive(Serialize)]
 struct DeepSeekFunction {
     name: String,
@@ -82,6 +118,7 @@ struct DeepSeekFunction {
     parameters: serde_json::Value,
 }
 
+/// DeepSeek 工具调用请求
 #[derive(Deserialize)]
 struct DeepSeekToolCall {
     id: String,
@@ -89,6 +126,7 @@ struct DeepSeekToolCall {
     function: DeepSeekFunctionCall,
 }
 
+/// DeepSeek 函数调用详情
 #[derive(Deserialize)]
 struct DeepSeekFunctionCall {
     name: String,
@@ -96,15 +134,22 @@ struct DeepSeekFunctionCall {
 }
 
 // =============================================================================
-// DeepSeekProvider
+// DeepSeekProvider 定义
 // =============================================================================
 
+/// DeepSeek API 提供者
+///
+/// 使用 DeepSeek Chat Completions API 与 LLM 交互。
+/// DeepSeek API 与 OpenAI 兼容，支持函数调用等功能。
 pub struct DeepSeekProvider {
+    /// HTTP 客户端
     client: Client,
+    /// API 密钥
     api_key: String,
 }
 
 impl DeepSeekProvider {
+    /// 创建新的 DeepSeek Provider 实例
     pub fn new(api_key: impl Into<String>) -> Self {
         Self {
             client: Client::new(),
@@ -114,9 +159,10 @@ impl DeepSeekProvider {
 }
 
 // =============================================================================
-// Helper Functions
+// 辅助函数
 // =============================================================================
 
+/// 将 hermes-core 的 Message 列表转换为 DeepSeek API 的消息格式
 fn convert_messages(messages: &[hermes_core::Message]) -> Vec<DeepSeekMessage> {
     use hermes_core::{Content, Role};
 

@@ -24,9 +24,21 @@ use hermes_core::{ToolContext, ToolError};
 use serde_json::json;
 use std::path::PathBuf;
 
+/// 文件读取工具
+///
+/// 根据给定路径读取文件内容，支持行偏移和行数限制。
+///
+/// # 工具参数
+/// - `path`（必填）：文件路径，支持绝对路径和相对路径
+/// - `offset`（可选）：行偏移量，默认 0
+/// - `limit`（可选）：最大读取行数，默认 1000
+///
+/// # 返回格式
+/// JSON 包含 `success`、`path`、`content`、`size`
 pub struct ReadFileTool;
 
 impl ReadFileTool {
+    /// 创建新的 ReadFileTool 实例
     pub fn new() -> Self {
         Self
     }
@@ -101,9 +113,24 @@ impl hermes_tool_registry::Tool for ReadFileTool {
     }
 }
 
+/// 文件写入工具
+///
+/// 将内容写入指定路径的文件，支持创建新文件和覆盖已有文件。
+///
+/// # 工具参数
+/// - `path`（必填）：文件路径，支持绝对路径和相对路径
+/// - `content`（必填）：要写入的内容
+///
+/// # 返回格式
+/// JSON 包含 `success`、`path`、`bytes_written`
+///
+/// # 安全说明
+/// - 不支持目录创建，依赖父目录已存在
+/// - 相对路径基于 `context.working_directory` 解析
 pub struct WriteFileTool;
 
 impl WriteFileTool {
+    /// 创建新的 WriteFileTool 实例
     pub fn new() -> Self {
         Self
     }

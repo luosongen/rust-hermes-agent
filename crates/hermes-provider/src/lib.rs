@@ -21,15 +21,25 @@
 //!
 //! [`OpenAiProvider`]: openai::OpenAiProvider
 
+/// 从 hermes-core 重导出的 LlmProvider trait
 pub mod traits;
+/// OpenAI API 提供者实现
 pub mod openai;
+/// Anthropic Claude API 提供者实现
 pub mod anthropic;
+/// OpenRouter 聚合 API 提供者实现（支持 200+ 模型）
 pub mod openrouter;
+/// 智谱 AI (GLM) 提供者实现
 pub mod glm;
+/// MiniMax 海螺 AI 提供者实现
 pub mod minimax;
+/// Kimi (Moonshot AI) 提供者实现
 pub mod kimi;
+/// DeepSeek 提供者实现
 pub mod deepseek;
+/// 阿里云百炼 (Qwen) 提供者实现
 pub mod qwen;
+/// Provider 路由器（根据 model.provider 自动选择 Provider）
 pub mod router;
 
 pub use traits::*;

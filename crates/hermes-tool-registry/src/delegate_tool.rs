@@ -1,4 +1,19 @@
-//! DelegateTool — spawns subagents to handle tasks in parallel.
+//! DelegateTool — 委托工具，允许 Agent 生成子 Agent 并行处理任务
+//!
+//! 本模块实现了 `Tool` trait，提供 `delegate` 工具，使主 Agent 能够将复杂任务
+//! 委托给一个或多个子 Agent 并行执行。子 Agent 拥有受限的工具集，从而实现安全隔离。
+//!
+//! ## 核心功能
+//! - **单任务委托** — 通过 `goal` 参数将单个任务委托给一个子 Agent
+//! - **批量并行委托** — 通过 `tasks` 数组将多个任务并行分配给多个子 Agent
+//! - **工具集过滤** — 子 Agent 仅能使用 `toolsets` 白名单中指定的工具
+//! - **深度限制** — 防止无限递归委托，最大深度由 `MAX_DELEGATION_DEPTH` 控制
+//! - **并发限制** — 批量委托通过信号量控制最大并发数
+//!
+//! ## 与 Agent 的关系
+//! - 子 Agent 与父 Agent 共享相同的 LLM Provider
+//! - 子 Agent 的模型、温度、最大 token 等配置继承自父 Agent
+//! - 子 Agent 无法使用 `delegate` 工具本身（通过 `BLOCKED_TOOLS` 黑名单过滤）
 
 use async_trait::async_trait;
 use hermes_core::{
@@ -13,14 +28,21 @@ use crate::Tool;
 use std::sync::Arc;
 use std::time::Instant;
 
-/// DelegateTool allows the agent to spawn subagents with restricted toolsets.
+/// 委托工具 — 允许 Agent 生成子 Agent 并行处理任务
+///
+/// 持有父 Agent 的引用，通过受限工具集和深度限制来隔离子 Agent 的能力。
+/// 子 Agent 使用与父 Agent 相同的 LLM Provider 进行对话。
 pub struct DelegateTool {
+    /// 父 Agent 的引用，用于生成子 Agent 和获取其配置
     parent_agent: Arc<Agent>,
+    /// 批量委托时的最大并发数
     max_concurrent: usize,
+    /// 允许的最大委托深度
     max_depth: u8,
 }
 
 impl DelegateTool {
+    /// 使用默认配置（`DEFAULT_MAX_CONCURRENT` 和 `MAX_DELEGATION_DEPTH`）创建委托工具
     pub fn new(parent_agent: Arc<Agent>) -> Self {
         Self {
             parent_agent,
@@ -29,6 +51,11 @@ impl DelegateTool {
         }
     }
 
+    /// 使用自定义配置创建委托工具
+    ///
+    /// - `parent_agent` — 父 Agent，用于生成子 Agent
+    /// - `max_concurrent` — 批量委托时的最大并发数
+    /// - `max_depth` — 允许的最大委托深度
     pub fn with_config(parent_agent: Arc<Agent>, max_concurrent: usize, max_depth: u8) -> Self {
         Self {
             parent_agent,
@@ -37,7 +64,9 @@ impl DelegateTool {
         }
     }
 
-    /// Filter tool definitions by name prefix and strip blocked tools.
+    /// 根据 toolsets 白名单过滤工具定义，并移除被 BLOCKED_TOOLS 黑名单禁止的工具
+    ///
+    /// 如果未指定 toolsets，则返回所有非黑名单工具。如果过滤后结果为空，返回 `None`。
     fn filter_tools(&self, toolsets: Option<&[String]>) -> Option<Vec<ToolDefinition>> {
         let all_tools = self.parent_agent.tools().get_definitions();
 
@@ -62,6 +91,10 @@ impl DelegateTool {
         }
     }
 
+    /// 运行单个子 Agent 任务
+    ///
+    /// 检查深度限制，构建子 Agent 的提示词和配置，过滤工具集，然后生成并等待子 Agent 完成。
+    /// 返回 `DelegateResult`，包含执行状态、摘要、API 调用次数和耗时。
     async fn run_single_child(&self, task: DelegateTask, parent_depth: u8) -> DelegateResult {
         let start = Instant::now();
 
@@ -120,6 +153,10 @@ impl DelegateTool {
         }
     }
 
+    /// 构建子 Agent 的系统提示词
+    ///
+    /// 将目标（goal）和上下文（context）格式化为一个结构化的提示词，
+    /// 告知子 Agent 其角色和任务，并要求返回结构化的执行摘要。
     fn build_child_prompt(goal: &str, context: Option<&str>) -> String {
         let context_str = context.unwrap_or("");
         format!(
@@ -129,6 +166,10 @@ impl DelegateTool {
         )
     }
 
+    /// 生成并运行一个子 Agent
+    ///
+    /// 循环调用 LLM Provider，传入过滤后的工具集，直到达到停止条件（finish_reason == Stop）
+    /// 或达到最大迭代次数。记录 API 调用次数并返回对话响应。
     async fn spawn_child_agent(
         &self,
         config: &AgentConfig,
@@ -184,6 +225,10 @@ impl DelegateTool {
         Err(ToolError::Execution("Max iterations exceeded".to_string()))
     }
 
+    /// 批量并行运行多个子 Agent 任务
+    ///
+    /// 使用 tokio 信号量（Semaphore）限制最大并发数，将任务分配给独立的异步任务，
+    /// 等待所有任务完成后返回 `Vec<DelegateResult>`。
     async fn run_batch(
         &self,
         tasks: Vec<DelegateTask>,

@@ -1,7 +1,23 @@
 //! McpClientBridge — MCP Client Bridge
 //!
-//! Connects as a client to external MCP servers over stdio, exposing remote tools
-//! as locally-namespaced tools.
+//! 作为客户端通过 stdio 连接到外部 MCP 服务器，将远程工具以本地命名空间的形式暴露。
+//!
+//! ## 工作原理
+//! - 通过子进程启动 MCP 服务器（通过 stdio 通信）
+//! - 发送 JSON-RPC 2.0 请求/响应
+//! - 远程工具名称以 `server_name.tool_name` 格式暴露
+//! - 支持 `initialize`、`tools/list`、`tools/call` 等 MCP 协议方法
+//!
+//! ## 核心类型
+//! - `McpClientBridge`: MCP 客户端主结构，管理进程通信和工具列表
+//! - `McpTool`: 远程工具的本地包装器，实现 `Tool` trait
+//! - `McpClientDispatcher`: 实现 `ToolDispatcher` trait，用于工具调度
+//!
+//! ## 主要方法
+//! - `connect()`: 启动 MCP 服务器并初始化连接
+//! - `call_tool()`: 调用远程工具
+//! - `list_tools()`: 获取可用工具列表
+//! - `disconnect()`: 断开连接并终止子进程
 
 use async_trait::async_trait;
 use hermes_core::{ToolCall, ToolContext, ToolDefinition, ToolDispatcher, ToolError};
@@ -14,7 +30,7 @@ use tokio::io::BufReader;
 use tokio::process::{ChildStdin, ChildStdout, Command};
 use tokio::sync::Mutex as AsyncMutex;
 
-/// MCP JSON-RPC request
+/// MCP JSON-RPC 请求结构
 #[derive(Debug, Serialize)]
 struct JsonRpcRequest {
     jsonrpc: String,
@@ -35,7 +51,7 @@ impl JsonRpcRequest {
     }
 }
 
-/// MCP JSON-RPC response
+/// MCP JSON-RPC 响应结构
 #[derive(Debug, Deserialize)]
 struct JsonRpcResponse {
     jsonrpc: String,
@@ -47,13 +63,14 @@ struct JsonRpcResponse {
     error: Option<McpErrorResponse>,
 }
 
+/// MCP JSON-RPC 错误响应体
 #[derive(Debug, Deserialize)]
 struct McpErrorResponse {
     code: i32,
     message: String,
 }
 
-/// Initialize request params
+/// initialize 请求参数
 #[derive(Debug, Serialize)]
 struct InitializeParams {
     protocol_version: String,
@@ -61,18 +78,20 @@ struct InitializeParams {
     client_info: ClientInfo,
 }
 
+/// 客户端信息（发送给 MCP 服务器）
 #[derive(Debug, Serialize)]
 struct ClientInfo {
     name: String,
     version: String,
 }
 
-/// Tools/list response
+/// tools/list 响应结构
 #[derive(Debug, Deserialize)]
 struct ToolsListResponse {
     tools: Vec<RemoteTool>,
 }
 
+/// 远程工具描述（来自 MCP 服务器的 tools/list 响应）
 #[derive(Debug, Deserialize)]
 struct RemoteTool {
     name: String,
@@ -81,12 +100,13 @@ struct RemoteTool {
     input_schema: serde_json::Value,
 }
 
-/// tools/call response
+/// tools/call 响应结构
 #[derive(Debug, Deserialize)]
 struct ToolsCallResponse {
     content: Vec<ContentItem>,
 }
 
+/// 工具调用响应中的内容项（支持 text 等类型）
 #[derive(Debug, Deserialize)]
 struct ContentItem {
     #[serde(rename = "type")]
@@ -94,7 +114,10 @@ struct ContentItem {
     text: Option<String>,
 }
 
-/// Wrapper for a remote tool exposed by McpClientBridge
+/// McpTool — 远程工具的本地包装器
+///
+/// 封装从 MCP 服务器获取的远程工具，提供本地化的 `Tool` trait 实现。
+/// 工具名称包含命名空间前缀 `server_name.tool_name`。
 pub struct McpTool {
     full_name: String,
     description: String,
@@ -136,7 +159,10 @@ impl Tool for McpTool {
     }
 }
 
-/// MCP Client Bridge — connects to external MCP servers over stdio
+/// McpClientBridge — MCP 客户端桥接器
+///
+/// 通过子进程启动外部 MCP 服务器，通过 stdio 进行 JSON-RPC 2.0 通信。
+/// 管理进程生命周期、请求 ID 分配和工具列表。
 pub struct McpClientBridge {
     server_name: String,
     command: String,
@@ -149,7 +175,9 @@ pub struct McpClientBridge {
 }
 
 impl McpClientBridge {
-    /// Connect to an MCP server
+    /// 连接到 MCP 服务器
+    ///
+    /// 启动子进程，发送初始化请求，获取工具列表。
     pub async fn connect(
         server_name: &str,
         command: &str,
@@ -210,7 +238,10 @@ impl McpClientBridge {
         Ok(client)
     }
 
-    /// Send initialize request
+    /// 发送初始化请求
+    ///
+    /// 发送 `initialize` JSON-RPC 请求，设置协议版本为 "2024-11-05"，
+    /// 发送 `notifications/initialized` 通知完成握手。
     async fn send_initialize(&mut self) -> Result<(), ToolError> {
         let id = self.next_id();
 
@@ -240,7 +271,9 @@ impl McpClientBridge {
         Ok(())
     }
 
-    /// Send tools/list request
+    /// 发送 tools/list 请求
+    ///
+    /// 获取 MCP 服务器上注册的所有工具，返回 `RemoteTool` 列表。
     async fn send_tools_list(&mut self) -> Result<Vec<RemoteTool>, ToolError> {
         let id = self.next_id();
         let request = JsonRpcRequest::new(id, "tools/list", None);
@@ -267,7 +300,9 @@ impl McpClientBridge {
         Ok(tools_resp.tools)
     }
 
-    /// Send a JSON-RPC request
+    /// 发送 JSON-RPC 请求
+    ///
+    /// 将请求序列化为 JSON，写入子进程的 stdin，并刷新缓冲区。
     async fn send_request(&self, request: JsonRpcRequest) -> Result<(), ToolError> {
         let json = serde_json::to_string(&request).map_err(|e| {
             ToolError::Execution(format!("Failed to serialize request: {}", e))
@@ -289,7 +324,10 @@ impl McpClientBridge {
         Ok(())
     }
 
-    /// Read responses until we find the one matching the given id
+    /// 读取响应直到找到匹配的请求 ID
+    ///
+    /// 从 stdout 逐行读取，跳过通知消息（无 id）和解析错误，
+    /// 找到目标 ID 的响应后返回。
     async fn read_response(&self, target_id: i64) -> Result<JsonRpcResponse, ToolError> {
         let mut line = String::new();
 
@@ -351,14 +389,16 @@ impl McpClientBridge {
         }
     }
 
-    /// Get the next request ID
+    /// 获取下一个请求 ID（线程安全递增）
     fn next_id(&self) -> i64 {
         let mut id = self.request_id.lock();
         *id += 1;
         *id
     }
 
-    /// Disconnect from the MCP server
+    /// 断开与 MCP 服务器的连接
+    ///
+    /// 终止子进程，将 `child` 置为 `None`。
     pub fn disconnect(&mut self) -> Result<(), ToolError> {
         if let Some(ref mut child) = self.child {
             child.start_kill().map_err(|e| {
@@ -369,12 +409,14 @@ impl McpClientBridge {
         Ok(())
     }
 
-    /// List tools available from the connected server
+    /// 列出已连接服务器上可用的工具
     pub fn list_tools(&self) -> Vec<ToolDefinition> {
         self.tools.lock().clone()
     }
 
-    /// Call a remote tool
+    /// 调用远程工具
+    ///
+    /// 发送 `tools/call` JSON-RPC 请求，从响应中提取文本内容并返回。
     pub async fn call_tool(&self, tool_name: &str, arguments: serde_json::Value) -> Result<String, ToolError> {
         let id = {
             let mut counter = self.request_id.lock();
@@ -420,7 +462,9 @@ impl McpClientBridge {
         Ok(texts.join("\n"))
     }
 
-    /// Create a tool wrapper for dispatching via ToolDispatcher
+    /// 创建工具调度器包装
+    ///
+    /// 将自身转换为 `Arc<Self>`，然后生成实现 `ToolDispatcher` trait 的调度器。
     pub fn into_dispatcher(self: Arc<Self>) -> McpClientDispatcher {
         McpClientDispatcher {
             client: self,
@@ -437,7 +481,10 @@ impl Drop for McpClientBridge {
     }
 }
 
-/// Wrapper that implements ToolDispatcher for McpClientBridge
+/// McpClientDispatcher — MCP 客户端工具调度器
+///
+/// 实现 `ToolDispatcher` trait，将 `McpClientBridge` 的远程工具接入 Hermes 的工具调度系统。
+/// 调度时自动去掉命名空间前缀得到远程工具名称。
 pub struct McpClientDispatcher {
     client: Arc<McpClientBridge>,
 }
