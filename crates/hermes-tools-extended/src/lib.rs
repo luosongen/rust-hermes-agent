@@ -18,6 +18,7 @@ pub mod cli_executor;
 pub mod vision;
 pub mod memory;
 pub mod delegate_tool;
+pub mod code_execution;
 
 pub use web_search::{WebSearchTool, SearchResult};
 pub use web_fetch::WebFetchTool;
@@ -28,6 +29,7 @@ pub use cli_executor::{CliExecutor, ExecutorConfig, ExecutionResult};
 pub use vision::VisionTool;
 pub use memory::MemoryTool;
 pub use delegate_tool::DelegateTool;
+pub use code_execution::CodeExecutionTool;
 
 use hermes_core::LlmProvider;
 use hermes_memory::SqliteSessionStore;
