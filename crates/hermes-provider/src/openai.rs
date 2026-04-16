@@ -73,8 +73,8 @@ struct OpenAiRequest {
 struct OpenAiMessage {
     /// 角色（"system"、"user"、"assistant"、"tool"）
     role: String,
-    /// 消息内容
-    content: String,
+    /// 消息内容（文本字符串或内容块数组，支持多模态）
+    content: serde_json::Value,
 }
 
 /// OpenAI 工具定义结构
@@ -213,9 +213,15 @@ impl OpenAiProvider {
                 .to_string();
 
                 let content = match &m.content {
-                    Content::Text(t) => t.clone(),
-                    Content::Image { url, .. } => url.clone(),
-                    Content::ToolResult { content, .. } => content.clone(),
+                    Content::Text(t) => serde_json::json!([{ "type": "text", "text": t }]),
+                    Content::Image { url, detail } => {
+                        let mut obj = serde_json::json!({ "type": "image_url", "image_url": { "url": url } });
+                        if let Some(d) = detail {
+                            obj["image_url"]["detail"] = serde_json::json!(d);
+                        }
+                        serde_json::json!([obj])
+                    }
+                    Content::ToolResult { content, .. } => serde_json::json!([{ "type": "text", "text": content }]),
                 };
 
                 OpenAiMessage { role, content }
@@ -227,7 +233,7 @@ impl OpenAiProvider {
         if let Some(sys) = &request.system_prompt {
             all_messages.push(OpenAiMessage {
                 role: "system".to_string(),
-                content: sys.clone(),
+                content: serde_json::json!([{ "type": "text", "text": sys }]),
             });
         }
         all_messages.extend(messages);

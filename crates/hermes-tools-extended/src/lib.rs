@@ -16,6 +16,7 @@ pub mod mcp_server;
 pub mod mcp_client;
 pub mod cli_executor;
 pub mod vision;
+pub mod memory;
 
 pub use web_search::WebSearchTool;
 pub use web_fetch::WebFetchTool;
@@ -24,12 +25,22 @@ pub use mcp_server::McpServerBridge;
 pub use mcp_client::{McpClientBridge, McpClientDispatcher, McpTool};
 pub use cli_executor::{CliExecutor, ExecutorConfig, ExecutionResult};
 pub use vision::VisionTool;
+pub use memory::MemoryTool;
 
+use hermes_core::LlmProvider;
+use hermes_memory::SqliteSessionStore;
 use hermes_tool_registry::ToolRegistry;
+use std::sync::Arc;
 
-pub fn register_extended_tools(registry: &ToolRegistry) {
+pub fn register_extended_tools(
+    registry: &ToolRegistry,
+    llm_provider: Arc<dyn LlmProvider>,
+    session_store: Arc<SqliteSessionStore>,
+) {
     registry.register(WebSearchTool::new());
     registry.register(WebFetchTool::new());
     registry.register(CronScheduler::new());
     registry.register(CliExecutor::new(ExecutorConfig::default()));
+    registry.register(VisionTool::new(llm_provider));
+    registry.register(MemoryTool::new(session_store));
 }
