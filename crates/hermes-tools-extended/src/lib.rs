@@ -7,16 +7,21 @@
 //! - **`web_fetch`** — 网页内容抓取
 //! - **`cron_scheduler`** — 定时任务调度
 //! - **`mcp_server`** — MCP Server Bridge
+//! - **`mcp_client`** — MCP Client Bridge
 
 pub mod web_search;
 pub mod web_fetch;
 pub mod cron_scheduler;
 pub mod mcp_server;
+pub mod mcp_client;
+pub mod cli_executor;
 
 pub use web_search::WebSearchTool;
 pub use web_fetch::WebFetchTool;
 pub use cron_scheduler::CronScheduler;
 pub use mcp_server::McpServerBridge;
+pub use mcp_client::{McpClientBridge, McpClientDispatcher, McpTool};
+pub use cli_executor::{CliExecutor, ExecutorConfig, ExecutionResult};
 
 use hermes_tool_registry::ToolRegistry;
 
@@ -24,4 +29,5 @@ pub fn register_extended_tools(registry: &ToolRegistry) {
     registry.register(WebSearchTool::new());
     registry.register(WebFetchTool::new());
     registry.register(CronScheduler::new());
+    registry.register(CliExecutor::new(ExecutorConfig::default()));
 }
