@@ -270,7 +270,6 @@ impl LlmVisionProvider {
 #[derive(Clone)]
 pub struct VisionTool {
     providers: std::collections::HashMap<String, VisionProvider>,
-    default_provider: String,
 }
 
 impl std::fmt::Debug for VisionTool {
@@ -283,10 +282,7 @@ impl VisionTool {
     pub fn new(provider: Arc<dyn LlmProvider>) -> Self {
         let mut providers = std::collections::HashMap::new();
         providers.insert("llm".to_string(), VisionProvider::Llm(LlmVisionProvider::new(provider)));
-        Self {
-            providers,
-            default_provider: "llm".to_string(),
-        }
+        Self { providers }
     }
 
     pub fn with_openai(mut self, api_key: String, model: &str) -> Self {
