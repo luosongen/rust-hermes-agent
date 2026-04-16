@@ -17,6 +17,7 @@ pub mod mcp_client;
 pub mod cli_executor;
 pub mod vision;
 pub mod memory;
+pub mod delegate_tool;
 
 pub use web_search::{WebSearchTool, SearchResult};
 pub use web_fetch::WebFetchTool;
@@ -26,6 +27,7 @@ pub use mcp_client::{McpClientBridge, McpClientDispatcher, McpTool};
 pub use cli_executor::{CliExecutor, ExecutorConfig, ExecutionResult};
 pub use vision::VisionTool;
 pub use memory::MemoryTool;
+pub use delegate_tool::DelegateTool;
 
 use hermes_core::LlmProvider;
 use hermes_memory::SqliteSessionStore;
