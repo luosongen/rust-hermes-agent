@@ -17,3 +17,4 @@ scraper.workspace = true
 regex.workspace = true
 cron.workspace = true
 urlencoding.workspace = true
+base64 = "0.22"

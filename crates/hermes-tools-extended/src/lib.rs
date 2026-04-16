@@ -15,6 +15,7 @@ pub mod cron_scheduler;
 pub mod mcp_server;
 pub mod mcp_client;
 pub mod cli_executor;
+pub mod vision;
 
 pub use web_search::WebSearchTool;
 pub use web_fetch::WebFetchTool;
@@ -22,6 +23,7 @@ pub use cron_scheduler::CronScheduler;
 pub use mcp_server::McpServerBridge;
 pub use mcp_client::{McpClientBridge, McpClientDispatcher, McpTool};
 pub use cli_executor::{CliExecutor, ExecutorConfig, ExecutionResult};
+pub use vision::VisionTool;
 
 use hermes_tool_registry::ToolRegistry;
 
