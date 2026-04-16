@@ -15,7 +15,7 @@ pub struct CompressionStatus {
 /// Context management engine trait.
 /// Implementations can be compressors (default), replacers, or other strategies.
 #[async_trait]
-pub trait ContextEngine: Send + Sync {
+pub trait ContextEngine {
     /// Returns the engine's name (e.g., "compressor", "dummy").
     fn name(&self) -> &str;
 
