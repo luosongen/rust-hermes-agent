@@ -52,6 +52,7 @@ pub mod gateway;
 pub mod config;
 pub mod context_compressor;
 pub mod traits;
+pub mod delegate;
 
 pub use credentials::CredentialPool;
 pub use context_compressor::ContextCompressor;
