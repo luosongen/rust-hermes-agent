@@ -18,4 +18,5 @@ hermes-tool-registry.workspace = true
 hermes-skills.workspace = true
 parking_lot.workspace = true
 toml.workspace = true
+uuid.workspace = true
 once_cell.workspace = true
