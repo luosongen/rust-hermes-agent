@@ -3,6 +3,9 @@
 //! 使用 LLM 摘要压缩长对话，保留头部和尾部消息，总结中间轮次。
 
 use crate::{ChatRequest, Content, LlmProvider, Message, ModelId, Role};
+use crate::traits::context_engine::{CompressionStatus, ContextEngine};
+use crate::ToolError;
+use async_trait::async_trait;
 use std::sync::Arc;
 
 /// 摘要前缀标记
@@ -448,6 +451,60 @@ impl ContextCompressor {
 }
 
 // =============================================================================
+// ContextEngine implementation
+// =============================================================================
+
+#[async_trait]
+impl ContextEngine for ContextCompressor {
+    fn name(&self) -> &str {
+        "compressor"
+    }
+
+    fn should_compress(&self, prompt_tokens: usize) -> bool {
+        ContextCompressor::should_compress(self, prompt_tokens)
+    }
+
+    async fn compress(
+        &self,
+        messages: &[Message],
+        prompt_tokens: usize,
+        focus_topic: Option<&str>,
+    ) -> Result<Vec<Message>, ToolError> {
+        let mut self_clone = Self {
+            llm: self.llm.clone(),
+            model: self.model.clone(),
+            context_length: self.context_length,
+            threshold_percent: self.threshold_percent,
+            summary_target_ratio: self.summary_target_ratio,
+            protect_first_n: self.protect_first_n,
+            protect_last_n: self.protect_last_n,
+            tail_token_budget: self.tail_token_budget,
+            max_summary_tokens: self.max_summary_tokens,
+            compression_count: self.compression_count,
+            previous_summary: self.previous_summary.clone(),
+        };
+        ContextCompressor::compress(&mut self_clone, messages.to_vec(), Some(prompt_tokens), focus_topic)
+            .await
+            .map_err(ToolError::Execution)
+    }
+
+    fn on_session_reset(&mut self) {
+        self.compression_count = 0;
+        self.previous_summary = None;
+    }
+
+    fn get_status(&self) -> CompressionStatus {
+        let threshold = (self.context_length as f32 * self.threshold_percent) as usize;
+        CompressionStatus {
+            compression_count: self.compression_count,
+            current_tokens: 0,
+            threshold_tokens: threshold,
+            model: self.model.clone(),
+        }
+    }
+}
+
+// =============================================================================
 // Tests
 // =============================================================================
 
@@ -519,7 +576,7 @@ mod tests {
             Message::user("How are you?"),
         ];
 
-        let result = compressor.compress(messages, None, None).await.unwrap();
+        let result = ContextCompressor::compress(&mut compressor, messages, None, None).await.unwrap();
         // 短对话不应被压缩
         assert_eq!(result.len(), 3);
     }
