@@ -34,11 +34,14 @@ pub mod skills;
 pub mod terminal_tools;
 /// 任务列表管理工具模块
 pub mod todo_tools;
+/// 用户交互工具模块
+pub mod clarify_tools;
 
 pub use file_tools::{ReadFileTool, WriteFileTool};
 pub use skills::{load_skill_registry, SkillExecuteTool, SkillListTool, SkillSearchTool};
 pub use terminal_tools::TerminalTool;
 pub use todo_tools::{TodoStore, TodoTool};
+pub use clarify_tools::ClarifyTool;
 
 use hermes_tool_registry::ToolRegistry;
 
