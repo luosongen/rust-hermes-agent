@@ -622,4 +622,70 @@ mod tests {
         assert!(matches!(result[0].content, Content::ToolResult { content: ref c, .. }
             if c.contains("cleared")));
     }
+
+    #[test]
+    fn test_compression_status() {
+        use crate::traits::context_engine::ContextEngine;
+        let llm = Arc::new(MockLlmProvider::new());
+        let compressor = ContextCompressor::new(llm, "test-model".to_string(), 100_000);
+
+        let status = compressor.get_status();
+        assert_eq!(status.model, "test-model");
+        assert_eq!(status.compression_count, 0);
+    }
+
+    #[test]
+    fn test_serialize_for_summary() {
+        let llm = Arc::new(MockLlmProvider::new());
+        let compressor = ContextCompressor::new(llm, "test".to_string(), 1000);
+
+        let messages = vec![
+            Message::user("Hello"),
+            Message::assistant("Hi there!"),
+            Message::user("Write me a file"),
+        ];
+
+        let serialized = compressor.serialize_for_summary(&messages);
+        assert!(serialized.contains("[USER]:"));
+        assert!(serialized.contains("[ASSISTANT]:"));
+        assert!(serialized.contains("Hello"));
+    }
+
+    #[tokio::test]
+    async fn test_compress_short_conversation_unchanged() {
+        let llm = Arc::new(MockLlmProvider::new());
+        let mut compressor = ContextCompressor::new(llm, "test".to_string(), 1000);
+
+        let messages = vec![
+            Message::user("Hello"),
+            Message::assistant("Hi!"),
+        ];
+
+        let result = ContextCompressor::compress(&mut compressor, messages.clone(), None, None).await.unwrap();
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_sanitize_inserts_stub_for_missing_result() {
+        use crate::Role;
+        let llm = Arc::new(MockLlmProvider::new());
+        let compressor = ContextCompressor::new(llm, "test".to_string(), 1000);
+
+        // Assistant message with tool_call_id but no matching tool result
+        let messages = vec![
+            Message {
+                role: Role::Assistant,
+                content: crate::Content::Text("calling tool".to_string()),
+                reasoning: None,
+                tool_call_id: Some("call_abc".to_string()),
+                tool_name: Some("Bash".to_string()),
+            },
+        ];
+
+        let sanitized = compressor.sanitize_tool_pairs(messages);
+        // Should have the original assistant msg + stub tool result
+        assert_eq!(sanitized.len(), 2);
+        assert!(matches!(sanitized[1].content, crate::Content::ToolResult { content: ref c, .. }
+            if c.contains("earlier conversation")));
+    }
 }
