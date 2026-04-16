@@ -18,7 +18,7 @@ pub mod cli_executor;
 pub mod vision;
 pub mod memory;
 
-pub use web_search::WebSearchTool;
+pub use web_search::{WebSearchTool, SearchResult};
 pub use web_fetch::WebFetchTool;
 pub use cron_scheduler::CronScheduler;
 pub use mcp_server::McpServerBridge;
