@@ -21,6 +21,7 @@ pub mod delegate_tool;
 pub mod code_execution;
 pub mod image_generation;
 pub mod transcription;
+pub mod homeassistant;
 pub mod mixture_of_agents;
 
 pub use web_search::{WebSearchTool, SearchResult};
@@ -33,8 +34,8 @@ pub use vision::VisionTool;
 pub use memory::MemoryTool;
 pub use delegate_tool::DelegateTool;
 pub use code_execution::CodeExecutionTool;
-pub use image_generation::ImageGenerationTool;
-pub use transcription::TranscriptionTool;
+pub use image_generation::{ImageGenerationTool, ImageSize};
+pub use homeassistant::HomeAssistantTool;
 pub use mixture_of_agents::MixtureOfAgentsTool;
 
 use hermes_core::LlmProvider;
@@ -53,7 +54,6 @@ pub fn register_extended_tools(
     registry.register(CliExecutor::new(ExecutorConfig::default()));
     registry.register(VisionTool::new(llm_provider));
     registry.register(MemoryTool::new(session_store));
-    registry.register(ImageGenerationTool::new());
-    registry.register(TranscriptionTool::new());
+    registry.register(HomeAssistantTool::new());
     registry.register(MixtureOfAgentsTool::new());
 }

@@ -33,20 +33,25 @@ impl MemoryTool {
         let pool = self.store.pool();
 
         // ALTER TABLE to add category and tags columns if not exist
-        let alter_result = sqlx::query("ALTER TABLE memory ADD COLUMN category TEXT")
+        // Only ignore "duplicate column" error — let other errors propagate
+        if let Err(e) = sqlx::query("ALTER TABLE memory ADD COLUMN category TEXT")
             .execute(pool)
-            .await;
-
-        if alter_result.is_err() {
-            // Column might already exist, ignore error
+            .await
+        {
+            let is_column_exists = e.to_string().contains("duplicate column");
+            if !is_column_exists {
+                return Err(ToolError::Execution(format!("ALTER TABLE error: {}", e)));
+            }
         }
 
-        let alter_tags_result = sqlx::query("ALTER TABLE memory ADD COLUMN tags TEXT")
+        if let Err(e) = sqlx::query("ALTER TABLE memory ADD COLUMN tags TEXT")
             .execute(pool)
-            .await;
-
-        if alter_tags_result.is_err() {
-            // Column might already exist, ignore error
+            .await
+        {
+            let is_column_exists = e.to_string().contains("duplicate column");
+            if !is_column_exists {
+                return Err(ToolError::Execution(format!("ALTER TABLE error: {}", e)));
+            }
         }
 
         // Create FTS5 virtual table
@@ -336,8 +341,8 @@ impl Tool for MemoryTool {
             MemoryParams::Set { key, value, category, tags } => {
                 let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs() as f64;
+                    .map(|d| d.as_secs() as f64)
+                    .unwrap_or(0.0);
                 let tags_json = serde_json::to_string(&tags).unwrap_or_else(|_| "[]".to_string());
 
                 // Check if entry exists to preserve created_at

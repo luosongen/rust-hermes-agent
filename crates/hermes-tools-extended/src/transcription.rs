@@ -95,6 +95,7 @@ impl TranscriptionTool {
         let resp = self.http_client
             .post(GROQ_URL)
             .header("Authorization", format!("Bearer {}", api_key))
+            .multipart(form)
             .send()
             .await
             .map_err(|e| ToolError::Execution(format!("Groq API error: {}", e)))?;
