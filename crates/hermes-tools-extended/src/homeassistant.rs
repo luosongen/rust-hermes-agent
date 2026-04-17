@@ -60,6 +60,16 @@ impl HomeAssistantTool {
         Ok(())
     }
 
+    fn validate_domain(domain: &str) -> Result<(), ToolError> {
+        if BLOCKED_DOMAINS.contains(domain) {
+            return Err(ToolError::InvalidArgs(format!("Blocked domain: {}", domain)));
+        }
+        if !SERVICE_NAME_RE.is_match(domain) {
+            return Err(ToolError::InvalidArgs(format!("Invalid domain format: {}", domain)));
+        }
+        Ok(())
+    }
+
     async fn ha_get(&self, path: &str) -> Result<serde_json::Value, ToolError> {
         let url = format!("{}/api/{}", self.hass_url.trim_end_matches('/'), path);
         let mut req = self.http_client.get(&url);
@@ -67,7 +77,9 @@ impl HomeAssistantTool {
             req = req.header("Authorization", format!("Bearer {}", token));
         }
         let resp = req.send().await
-            .map_err(|e| ToolError::Execution(format!("HomeAssistant API error: {}", e)))?;
+            .map_err(|e| ToolError::Execution(format!("HomeAssistant API error: {}", e)))?
+            .error_for_status()
+            .map_err(|e| ToolError::Execution(format!("HomeAssistant HTTP error: {}", e)))?;
         let body: serde_json::Value = resp.json().await
             .map_err(|e| ToolError::Execution(format!("HomeAssistant response error: {}", e)))?;
         Ok(body)
@@ -80,7 +92,9 @@ impl HomeAssistantTool {
             req = req.header("Authorization", format!("Bearer {}", token));
         }
         let resp = req.json(&data).send().await
-            .map_err(|e| ToolError::Execution(format!("HomeAssistant POST error: {}", e)))?;
+            .map_err(|e| ToolError::Execution(format!("HomeAssistant POST error: {}", e)))?
+            .error_for_status()
+            .map_err(|e| ToolError::Execution(format!("HomeAssistant POST HTTP error: {}", e)))?;
         let body: serde_json::Value = resp.json().await
             .map_err(|e| ToolError::Execution(format!("HomeAssistant POST response error: {}", e)))?;
         Ok(body)
@@ -162,8 +176,10 @@ impl Tool for HomeAssistantTool {
 
         match params.action.as_str() {
             "ha_list_entities" => {
-                let state: serde_json::Value = self.ha_get("states").await?;
-                let state = state.as_array().ok_or_else(|| ToolError::Execution("Expected array from /api/states".to_string()))?;
+                let state_val = self.ha_get("states").await?;
+                let state: Vec<serde_json::Value> = state_val.as_array()
+                    .ok_or_else(|| ToolError::Execution("HA states did not return an array".to_string()))?
+                    .clone();
                 let filtered: Vec<_> = state.iter().filter(|s| {
                     if let (Some(dom), Some(area)) = (params.domain.as_ref(), params.area.as_ref()) {
                         s["entity_id"].as_str().map(|e: &str| e.starts_with(&format!("{}.", dom))).unwrap_or(false)
@@ -183,7 +199,11 @@ impl Tool for HomeAssistantTool {
                 Ok(json!({ "state": state }).to_string())
             }
             "ha_list_services" => {
-                let services: serde_json::Value = self.ha_get("services").await?;
+                if let Some(domain) = params.domain.as_ref() {
+                    Self::validate_domain(domain)?;
+                }
+                let services_val = self.ha_get("services").await?;
+                let services = services_val;
                 if let Some(domain) = params.domain.as_ref() {
                     let filtered = services.get(domain).cloned().unwrap_or(serde_json::Value::Null);
                     Ok(json!({ "services": filtered }).to_string())
@@ -193,6 +213,7 @@ impl Tool for HomeAssistantTool {
             }
             "ha_call_service" => {
                 let domain = params.domain.as_ref().unwrap();
+                Self::validate_domain(domain)?;
                 let service = params.service.as_ref().unwrap();
                 let entity_id = params.entity_id.as_ref().unwrap();
                 validate_entity_id(entity_id)?;

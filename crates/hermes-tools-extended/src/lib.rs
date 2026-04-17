@@ -52,4 +52,5 @@ pub fn register_extended_tools(
     registry.register(CliExecutor::new(ExecutorConfig::default()));
     registry.register(VisionTool::new(llm_provider));
     registry.register(MemoryTool::new(session_store));
+    registry.register(HomeAssistantTool::new());
 }
