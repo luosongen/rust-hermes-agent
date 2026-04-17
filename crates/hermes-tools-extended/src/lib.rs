@@ -20,6 +20,7 @@ pub mod memory;
 pub mod delegate_tool;
 pub mod code_execution;
 pub mod image_generation;
+pub mod transcription;
 
 pub use web_search::{WebSearchTool, SearchResult};
 pub use web_fetch::WebFetchTool;
