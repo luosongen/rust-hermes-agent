@@ -224,3 +224,38 @@ fn test_memory_tags() {
         _ => panic!("Expected Set"),
     }
 }
+
+#[test]
+fn test_session_remember_and_search() {
+    let store = make_temp_store();
+    let tool = MemoryTool::new(store);
+    block_on(tool.ensure_fts()).unwrap();
+
+    block_on(async {
+        let ctx = make_ctx();
+
+        // 写入 session message
+        tool.execute(serde_json::json!({
+            "action": "session_remember",
+            "session_id": "session-alpha",
+            "role": "user",
+            "content": "I want to build a Rust CLI tool"
+        }), ctx.clone()).await.unwrap();
+
+        tool.execute(serde_json::json!({
+            "action": "session_remember",
+            "session_id": "session-alpha",
+            "role": "assistant",
+            "content": "Great! Rust is perfect for CLI tools"
+        }), ctx.clone()).await.unwrap();
+
+        // 搜索
+        let result = tool.execute(serde_json::json!({
+            "action": "session_search",
+            "query": "Rust CLI"
+        }), ctx.clone()).await.unwrap();
+
+        let output: serde_json::Value = serde_json::from_str(&result).unwrap();
+        assert!(output["results"].is_array());
+    });
+}

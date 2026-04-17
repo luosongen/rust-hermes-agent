@@ -97,6 +97,43 @@ impl MemoryTool {
             .map_err(|e| ToolError::Execution(format!("FTS population error: {}", e)))?;
         }
 
+        // === session_messages FTS 表 ===
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS session_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at REAL NOT NULL
+            )"
+        )
+        .execute(pool)
+        .await
+        .map_err(|e| ToolError::Execution(format!("session_messages table error: {}", e)))?;
+
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id)")
+            .execute(pool)
+            .await
+            .map_err(|e| ToolError::Execution(format!("session index error: {}", e)))?;
+
+        sqlx::query(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS session_messages_fts USING fts5(
+                session_id UNINDEXED, role UNINDEXED, content,
+                content=session_messages, content_rowid=id
+            )"
+        )
+        .execute(pool)
+        .await
+        .map_err(|e| ToolError::Execution(format!("session_messages_fts error: {}", e)))?;
+
+        sqlx::query(
+            "CREATE TRIGGER IF NOT EXISTS session_messages_fts_insert AFTER INSERT ON session_messages
+             BEGIN INSERT INTO session_messages_fts(rowid, session_id, role, content) VALUES (new.id, new.session_id, new.role, new.content); END"
+        )
+        .execute(pool)
+        .await
+        .map_err(|e| ToolError::Execution(format!("session_messages insert trigger error: {}", e)))?;
+
         Ok(())
     }
 
@@ -114,6 +151,71 @@ impl MemoryTool {
 
         Ok(rows.into_iter().map(|(k, v, c)| MemoryResult { key: k, value: v, category: c }).collect())
     }
+
+    /// 存储单条会话消息
+    pub async fn session_remember(
+        &self,
+        session_id: &str,
+        role: &str,
+        content: &str,
+    ) -> Result<(), ToolError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as f64;
+
+        sqlx::query(
+            "INSERT INTO session_messages (session_id, role, content, created_at) VALUES (?, ?, ?, ?)"
+        )
+        .bind(session_id)
+        .bind(role)
+        .bind(content)
+        .bind(now)
+        .execute(self.store.pool())
+        .await
+        .map_err(|e| ToolError::Execution(format!("session_remember error: {}", e)))?;
+
+        Ok(())
+    }
+
+    /// 搜索历史会话
+    pub async fn search_sessions(
+        &self,
+        query: &str,
+        limit_sessions: usize,
+    ) -> Result<Vec<SessionSearchResult>, ToolError> {
+        // 1. FTS5 匹配获取 message rowids
+        let pattern = format!("\"{}\"", query.replace('"', "\"\""));
+        let matched: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT session_id, COUNT(*) as cnt FROM session_messages_fts WHERE session_messages_fts MATCH ? GROUP BY session_id ORDER BY cnt DESC LIMIT ?"
+        )
+        .bind(&pattern)
+        .bind(limit_sessions as i64)
+        .fetch_all(self.store.pool())
+        .await
+        .map_err(|e| ToolError::Execution(format!("search_sessions error: {}", e)))?;
+
+        let mut results = Vec::new();
+        for (session_id, cnt) in matched {
+            // 获取该 session 最新时间戳
+            let last_updated: Option<(f64,)> = sqlx::query_as(
+                "SELECT MAX(created_at) FROM session_messages WHERE session_id = ?"
+            )
+            .bind(&session_id)
+            .fetch_optional(self.store.pool())
+            .await
+            .map_err(|e| ToolError::Execution(format!("last_updated error: {}", e)))?;
+
+            results.push(SessionSearchResult {
+                session_id,
+                summary: format!("[{} matched messages]", cnt),
+                matched_messages: cnt as usize,
+                last_updated: last_updated.map(|(t,)| t).unwrap_or(0.0),
+            });
+        }
+
+        Ok(results)
+    }
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -121,6 +223,21 @@ pub struct MemoryResult {
     pub key: String,
     pub value: String,
     pub category: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SessionMessage {
+    pub role: String,
+    pub content: String,
+    pub timestamp: f64,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct SessionSearchResult {
+    pub session_id: String,
+    pub summary: String,
+    pub matched_messages: usize,
+    pub last_updated: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -137,6 +254,10 @@ pub enum MemoryParams {
     Get { key: String },
     Search { query: String, #[serde(default)] limit: Option<usize> },
     Read { #[serde(default)] category: Option<String> },
+    #[serde(rename = "session_remember")]
+    SessionRemember { session_id: String, role: String, content: String },
+    #[serde(rename = "session_search")]
+    SessionSearch { query: String, #[serde(default)] limit: Option<usize> },
 }
 
 #[async_trait]
@@ -182,6 +303,23 @@ impl Tool for MemoryTool {
                         "category": { "type": "string" }
                     },
                     "required": ["action"]
+                },
+                {
+                    "properties": {
+                        "action": { "const": "session_remember" },
+                        "session_id": { "type": "string" },
+                        "role": { "type": "string" },
+                        "content": { "type": "string" }
+                    },
+                    "required": ["action", "session_id", "role", "content"]
+                },
+                {
+                    "properties": {
+                        "action": { "const": "session_search" },
+                        "query": { "type": "string" },
+                        "limit": { "type": "integer", "default": 3 }
+                    },
+                    "required": ["action", "query"]
                 }
             ]
         })
@@ -293,6 +431,15 @@ impl Tool for MemoryTool {
                     obj
                 }).collect();
 
+                Ok(json!({ "results": results }).to_string())
+            }
+            MemoryParams::SessionRemember { session_id, role, content } => {
+                self.session_remember(&session_id, &role, &content).await?;
+                Ok(json!({ "status": "ok", "session_id": session_id }).to_string())
+            }
+            MemoryParams::SessionSearch { query, limit } => {
+                let limit = limit.unwrap_or(3);
+                let results = self.search_sessions(&query, limit).await?;
                 Ok(json!({ "results": results }).to_string())
             }
         }
