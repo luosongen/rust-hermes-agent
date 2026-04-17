@@ -21,6 +21,7 @@ pub mod delegate_tool;
 pub mod code_execution;
 pub mod image_generation;
 pub mod transcription;
+pub mod homeassistant;
 
 pub use web_search::{WebSearchTool, SearchResult};
 pub use web_fetch::WebFetchTool;
@@ -33,6 +34,7 @@ pub use memory::MemoryTool;
 pub use delegate_tool::DelegateTool;
 pub use code_execution::CodeExecutionTool;
 pub use image_generation::{ImageGenerationTool, ImageSize};
+pub use homeassistant::HomeAssistantTool;
 
 use hermes_core::LlmProvider;
 use hermes_memory::SqliteSessionStore;
