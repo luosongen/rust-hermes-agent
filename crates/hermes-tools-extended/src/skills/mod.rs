@@ -2,6 +2,8 @@
 //!
 //! 提供 list / view / search / sync / install / remove 操作。
 
+pub mod security_scanner;
+
 use async_trait::async_trait;
 use hermes_core::{ToolContext, ToolError};
 use hermes_tool_registry::Tool;
@@ -26,6 +28,10 @@ pub struct SkillMetadata {
     pub source: String,
     #[serde(default)]
     pub origin_hash: String,
+    #[serde(default)]
+    pub created_at: f64,
+    #[serde(default)]
+    pub updated_at: f64,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -220,6 +226,210 @@ impl SkillsTool {
 
         Ok(())
     }
+
+    async fn create_skill(&self, name: &str, content: &str, triggers: Option<Vec<String>>, tags: Option<Vec<String>>) -> Result<(), ToolError> {
+        self.ensure_dir().await?;
+
+        let skill_dir = self.skills_dir.join(name);
+        if skill_dir.join(SKILL_FILE).exists() {
+            return Err(ToolError::Execution(format!("skill '{}' already exists", name)));
+        }
+
+        // Security scan
+        let scan_result = crate::skills::security_scanner::scan_content(content);
+        if !scan_result.safe {
+            let threats: Vec<String> = scan_result.threats.iter()
+                .map(|t| format!("{} at line {}", t.pattern, t.line_number))
+                .collect();
+            return Err(ToolError::Execution(format!("security scan failed: {}", threats.join("; "))));
+        }
+
+        // Generate frontmatter
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as f64;
+
+        let triggers = triggers.unwrap_or_default();
+        let tags = tags.unwrap_or_default();
+
+        let frontmatter = format!(r#"---
+name: {}
+description: ""
+triggers: {:?}
+tags: {:?}
+created_at: {}
+updated_at: {}
+---
+
+{}"#, name, triggers, tags, now, now, content);
+
+        tokio::fs::create_dir_all(&skill_dir).await
+            .map_err(|e| ToolError::Execution(format!("failed to create dir: {}", e)))?;
+        tokio::fs::write(skill_dir.join(SKILL_FILE), &frontmatter).await
+            .map_err(|e| ToolError::Execution(format!("failed to write skill file: {}", e)))?;
+
+        Ok(())
+    }
+
+    async fn edit_skill(&self, name: &str, field: &str, value: &str) -> Result<(), ToolError> {
+        let skill_path = self.skills_dir.join(name).join(SKILL_FILE);
+        if !skill_path.exists() {
+            return Err(ToolError::Execution(format!("skill '{}' not found", name)));
+        }
+
+        let content = tokio::fs::read_to_string(&skill_path).await
+            .map_err(|e| ToolError::Execution(format!("failed to read skill: {}", e)))?;
+
+        let (mut meta, body) = Self::parse_skill_markdown(&content)
+            .ok_or_else(|| ToolError::Execution("failed to parse skill frontmatter".to_string()))?;
+
+        // Update field
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as f64;
+        meta.updated_at = now;
+
+        match field {
+            "description" => meta.description = value.to_string(),
+            "triggers" => {
+                meta.triggers = serde_json::from_str(value)
+                    .map_err(|e| ToolError::InvalidArgs(format!("invalid triggers JSON: {}", e)))?;
+            }
+            "tags" => {
+                meta.tags = serde_json::from_str(value)
+                    .map_err(|e| ToolError::InvalidArgs(format!("invalid tags JSON: {}", e)))?;
+            }
+            _ => return Err(ToolError::InvalidArgs(format!("unknown field: {}", field))),
+        }
+
+        // Reconstruct file
+        let frontmatter = format!(r#"---
+name: {}
+description: "{}"
+triggers: {:?}
+tags: {:?}
+created_at: {}
+updated_at: {}
+---
+
+{}"#, meta.name, meta.description, meta.triggers, meta.tags, meta.created_at, meta.updated_at, body.trim());
+
+        tokio::fs::write(&skill_path, &frontmatter).await
+            .map_err(|e| ToolError::Execution(format!("failed to write skill: {}", e)))?;
+
+        Ok(())
+    }
+
+    async fn delete_skill(&self, name: &str) -> Result<(), ToolError> {
+        let skill_dir = self.skills_dir.join(name);
+        if !skill_dir.exists() {
+            return Err(ToolError::Execution(format!("skill '{}' not found", name)));
+        }
+
+        tokio::fs::remove_dir_all(&skill_dir).await
+            .map_err(|e| ToolError::Execution(format!("failed to delete skill: {}", e)))?;
+
+        Ok(())
+    }
+
+    async fn patch_skill(&self, name: &str, patch_content: &str) -> Result<(), ToolError> {
+        let skill_path = self.skills_dir.join(name).join(SKILL_FILE);
+        if !skill_path.exists() {
+            return Err(ToolError::Execution(format!("skill '{}' not found", name)));
+        }
+
+        // Security scan the patch content
+        let scan_result = crate::skills::security_scanner::scan_content(patch_content);
+        if !scan_result.safe {
+            let threats: Vec<String> = scan_result.threats.iter()
+                .map(|t| format!("{} at line {}", t.pattern, t.line_number))
+                .collect();
+            return Err(ToolError::Execution(format!("security scan failed: {}", threats.join("; "))));
+        }
+
+        let content = tokio::fs::read_to_string(&skill_path).await
+            .map_err(|e| ToolError::Execution(format!("failed to read skill: {}", e)))?;
+
+        // Append patch to body
+        let (meta, body) = Self::parse_skill_markdown(&content)
+            .ok_or_else(|| ToolError::Execution("failed to parse skill frontmatter".to_string()))?;
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as f64;
+
+        let new_body = format!("{}\n\n---\n\n{}", body.trim(), patch_content);
+
+        let frontmatter = format!(r#"---
+name: {}
+description: "{}"
+triggers: {:?}
+tags: {:?}
+created_at: {}
+updated_at: {}
+---
+
+{}"#, meta.name, meta.description, meta.triggers, meta.tags, meta.created_at, now, new_body);
+
+        tokio::fs::write(&skill_path, &frontmatter).await
+            .map_err(|e| ToolError::Execution(format!("failed to write skill: {}", e)))?;
+
+        Ok(())
+    }
+
+    async fn scan_skills(&self, name: Option<&str>) -> Result<serde_json::Value, ToolError> {
+        let skills = if let Some(name) = name {
+            vec![(name.to_string(), self.skills_dir.join(name).join(SKILL_FILE))]
+        } else {
+            // Scan all skills
+            let mut paths = Vec::new();
+            let mut entries = tokio::fs::read_dir(&self.skills_dir).await
+                .map_err(|e| ToolError::Execution(format!("failed to read dir: {}", e)))?;
+            while let Some(entry) = entries.next_entry().await
+                .map_err(|e| ToolError::Execution(format!("dir read error: {}", e)))? {
+                let path = entry.path();
+                if path.is_dir() && !path.file_name().map(|n| n.to_string_lossy().starts_with('.')).unwrap_or(false) {
+                    paths.push((path.file_name().unwrap().to_string_lossy().to_string(), path.join(SKILL_FILE)));
+                }
+            }
+            paths
+        };
+
+        let mut all_threats = Vec::new();
+        let mut scanned_count = 0;
+
+        for (skill_name, skill_path) in skills {
+            if skill_path.exists() {
+                scanned_count += 1;
+                if let Ok(content) = tokio::fs::read_to_string(&skill_path).await {
+                    // Extract body content (skip frontmatter)
+                    if let Some((_, body)) = Self::parse_skill_markdown(&content) {
+                        let result = crate::skills::security_scanner::scan_content(&body);
+                        if !result.safe {
+                            for threat in result.threats {
+                                all_threats.push(serde_json::json!({
+                                    "skill": skill_name,
+                                    "pattern": threat.pattern,
+                                    "line_number": threat.line_number,
+                                    "severity": threat.severity
+                                }));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(json!({
+            "scanned": scanned_count,
+            "safe": all_threats.is_empty(),
+            "threats_found": all_threats.len(),
+            "results": all_threats
+        }))
+    }
 }
 
 #[async_trait]
@@ -237,7 +447,12 @@ impl Tool for SkillsTool {
                 {"properties": {"action": {"const": "search"}, "query": {"type": "string"}, "limit": {"type": "integer"}}, "required": ["action", "query"]},
                 {"properties": {"action": {"const": "sync"}}, "required": ["action"]},
                 {"properties": {"action": {"const": "install"}, "name": {"type": "string"}, "source": {"type": "string"}}, "required": ["action", "name"]},
-                {"properties": {"action": {"const": "remove"}, "name": {"type": "string"}}, "required": ["action", "name"]}
+                {"properties": {"action": {"const": "remove"}, "name": {"type": "string"}}, "required": ["action", "name"]},
+                {"properties": {"action": {"const": "create"}, "name": {"type": "string"}, "content": {"type": "string"}, "triggers": {"type": "array"}, "tags": {"type": "array"}}, "required": ["action", "name", "content"]},
+                {"properties": {"action": {"const": "edit"}, "name": {"type": "string"}, "field": {"type": "string"}, "value": {"type": "string"}}, "required": ["action", "name", "field", "value"]},
+                {"properties": {"action": {"const": "delete"}, "name": {"type": "string"}}, "required": ["action", "name"]},
+                {"properties": {"action": {"const": "patch"}, "name": {"type": "string"}, "patch_content": {"type": "string"}}, "required": ["action", "name", "patch_content"]},
+                {"properties": {"action": {"const": "scan"}, "name": {"type": "string"}}, "required": ["action"]}
             ]
         })
     }
@@ -251,6 +466,11 @@ impl Tool for SkillsTool {
             Sync,
             Install { name: String, #[serde(default)] source: Option<String> },
             Remove { name: String },
+            Create { name: String, content: String, #[serde(default)] triggers: Option<Vec<String>>, #[serde(default)] tags: Option<Vec<String>> },
+            Edit { name: String, field: String, value: String },
+            Delete { name: String },
+            Patch { name: String, patch_content: String },
+            Scan { #[serde(default)] name: Option<String> },
         }
 
         let params: SkillAction = serde_json::from_value(args)
@@ -323,6 +543,26 @@ impl Tool for SkillsTool {
                 let source = source.ok_or_else(|| ToolError::Execution("source required for new install".to_string()))?;
                 self.install_skill(&name, &source).await?;
                 Ok(json!({ "status": "ok", "name": name, "installed_path": self.skills_dir.join(&name).to_string_lossy() }).to_string())
+            }
+            SkillAction::Create { name, content, triggers, tags } => {
+                self.create_skill(&name, &content, triggers, tags).await?;
+                Ok(json!({ "status": "ok", "name": name }).to_string())
+            }
+            SkillAction::Edit { name, field, value } => {
+                self.edit_skill(&name, &field, &value).await?;
+                Ok(json!({ "status": "ok", "name": name }).to_string())
+            }
+            SkillAction::Delete { name } => {
+                self.delete_skill(&name).await?;
+                Ok(json!({ "status": "ok", "name": name }).to_string())
+            }
+            SkillAction::Patch { name, patch_content } => {
+                self.patch_skill(&name, &patch_content).await?;
+                Ok(json!({ "status": "ok", "name": name }).to_string())
+            }
+            SkillAction::Scan { name } => {
+                let result = self.scan_skills(name.as_deref()).await?;
+                Ok(result.to_string())
             }
         }
     }
