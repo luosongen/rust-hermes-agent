@@ -19,6 +19,7 @@ pub mod vision;
 pub mod memory;
 pub mod delegate_tool;
 pub mod code_execution;
+pub mod image_generation;
 
 pub use web_search::{WebSearchTool, SearchResult};
 pub use web_fetch::WebFetchTool;
@@ -30,6 +31,7 @@ pub use vision::VisionTool;
 pub use memory::MemoryTool;
 pub use delegate_tool::DelegateTool;
 pub use code_execution::CodeExecutionTool;
+pub use image_generation::ImageGenerationTool;
 
 use hermes_core::LlmProvider;
 use hermes_memory::SqliteSessionStore;
@@ -47,4 +49,5 @@ pub fn register_extended_tools(
     registry.register(CliExecutor::new(ExecutorConfig::default()));
     registry.register(VisionTool::new(llm_provider));
     registry.register(MemoryTool::new(session_store));
+    registry.register(ImageGenerationTool::new());
 }
