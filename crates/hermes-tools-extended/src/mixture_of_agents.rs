@@ -9,7 +9,6 @@ use reqwest::Client;
 use serde::Deserialize;
 use serde_json::json;
 use std::time::Duration;
-use tokio::task::JoinSet;
 
 const OPENROUTER_API_URL: &str = "https://openrouter.ai/api/v1/chat/completions";
 

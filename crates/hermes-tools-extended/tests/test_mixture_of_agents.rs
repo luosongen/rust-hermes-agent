@@ -14,7 +14,7 @@ fn test_moa_params() {
     unsafe { std::env::set_var("OPENROUTER_API_KEY", "test_key"); }
     let tool = hermes_tools_extended::mixture_of_agents::MixtureOfAgentsTool::new();
     let params = tool.parameters();
-    assert!(params.pointer("/properties/prompt").is_some());
-    assert!(params.pointer("/properties/reference_models").is_some());
-    assert!(params.pointer("/properties/aggregator_model").is_some());
+    assert!(params.pointer("/oneOf/0/properties/prompt").is_some());
+    assert!(params.pointer("/oneOf/0/properties/reference_models").is_some());
+    assert!(params.pointer("/oneOf/0/properties/aggregator_model").is_some());
 }
