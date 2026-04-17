@@ -9,7 +9,7 @@ use serde::Deserialize;
 use serde_json::json;
 use std::time::Duration;
 
-const FAL_FUX_PRO_URL: &str = "https://queue.fal.run/fal-ai/flux-2-pro";
+const FAL_FLUX_PRO_URL: &str = "https://queue.fal.run/fal-ai/flux-2-pro";
 const FAL_CLARITY_URL: &str = "https://queue.fal.run/fal-ai/clarity-upscaler";
 
 #[derive(Clone)]
@@ -54,7 +54,7 @@ impl ImageGenerationTool {
 }
 
 impl ImageGenerationTool {
-    async fn request_image(&self, prompt: &str, size: ImageSize) -> Result<String, ToolError> {
+    async fn request_image(&self, prompt: &str, size: ImageSize, num_inference_steps: u32, guidance_scale: f32) -> Result<String, ToolError> {
         let api_key = self.fal_api_key.as_ref()
             .ok_or_else(|| ToolError::Execution("FAL_API_KEY not set".to_string()))?;
 
@@ -68,14 +68,14 @@ impl ImageGenerationTool {
         let payload = serde_json::json!({
             "prompt": prompt,
             "image_size": size_str,
-            "num_inference_steps": 50,
-            "guidance_scale": 4.5,
+            "num_inference_steps": num_inference_steps,
+            "guidance_scale": guidance_scale,
             "num_images": 1,
             "enable_safety_checker": false
         });
 
         let resp = self.http_client
-            .post(FAL_FUX_PRO_URL)
+            .post(FAL_FLUX_PRO_URL)
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
             .json(&payload)
@@ -93,8 +93,9 @@ impl ImageGenerationTool {
     }
 
     async fn poll_result(&self, request_id: &str) -> Result<String, ToolError> {
-        let api_key = self.fal_api_key.as_ref().unwrap();
-        let url = format!("{}/results?request_id={}", FAL_FUX_PRO_URL, request_id);
+        let api_key = self.fal_api_key.as_ref()
+            .ok_or_else(|| ToolError::Execution("FAL_API_KEY not set".to_string()))?;
+        let url = format!("{}/results?request_id={}", FAL_FLUX_PRO_URL, request_id);
 
         for _ in 0..60 {
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
@@ -109,10 +110,16 @@ impl ImageGenerationTool {
             let body: serde_json::Value = resp.json().await
                 .map_err(|e| ToolError::Execution(format!("Fal.ai poll response error: {}", e)))?;
 
-            if body["status"] == "COMPLETED" {
-                let image_url = body["images"][0]["url"].as_str()
-                    .ok_or_else(|| ToolError::Execution("No image URL in Fal.ai response".to_string()))?;
-                return Ok(image_url.to_string());
+            match body["status"].as_str() {
+                Some("COMPLETED") => {
+                    let image_url = body["images"][0]["url"].as_str()
+                        .ok_or_else(|| ToolError::Execution("No image URL in Fal.ai response".to_string()))?;
+                    return Ok(image_url.to_string());
+                }
+                Some("FAILED") | Some("FAILURE") => {
+                    return Err(ToolError::Execution("Fal.ai job failed".to_string()));
+                }
+                _ => continue,
             }
         }
 
@@ -120,7 +127,8 @@ impl ImageGenerationTool {
     }
 
     async fn upscale(&self, image_url: &str) -> Result<String, ToolError> {
-        let api_key = self.fal_api_key.as_ref().unwrap();
+        let api_key = self.fal_api_key.as_ref()
+            .ok_or_else(|| ToolError::Execution("FAL_API_KEY not set".to_string()))?;
 
         let payload = serde_json::json!({
             "image_url": image_url,
@@ -224,7 +232,7 @@ impl Tool for ImageGenerationTool {
             _ => ImageSize::Landscape16x9,
         };
 
-        let request_id = self.request_image(&params.prompt, size).await?;
+        let request_id = self.request_image(&params.prompt, size, params.num_inference_steps, params.guidance_scale).await?;
         let image_url = self.poll_result(&request_id).await?;
         let upscaled_url = self.upscale(&image_url).await?;
 
