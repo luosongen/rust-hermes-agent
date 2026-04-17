@@ -1117,6 +1117,7 @@ dependencies = [
  "hermes-core",
  "hermes-memory",
  "hermes-tool-registry",
+ "lazy_static",
  "parking_lot",
  "regex",
  "reqwest",
