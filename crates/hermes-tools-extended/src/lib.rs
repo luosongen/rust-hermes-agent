@@ -19,6 +19,7 @@ pub mod vision;
 pub mod memory;
 pub mod delegate_tool;
 pub mod code_execution;
+pub mod image_generation;
 
 pub use web_search::{WebSearchTool, SearchResult};
 pub use web_fetch::WebFetchTool;
@@ -30,6 +31,7 @@ pub use vision::VisionTool;
 pub use memory::MemoryTool;
 pub use delegate_tool::DelegateTool;
 pub use code_execution::CodeExecutionTool;
+pub use image_generation::{ImageGenerationTool, ImageSize};
 
 use hermes_core::LlmProvider;
 use hermes_memory::SqliteSessionStore;
