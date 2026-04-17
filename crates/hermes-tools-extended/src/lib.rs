@@ -24,6 +24,7 @@ pub mod transcription;
 pub mod homeassistant;
 pub mod mixture_of_agents;
 pub mod skills;
+pub mod rl_training;
 
 pub use web_search::{WebSearchTool, SearchResult};
 pub use web_fetch::WebFetchTool;
@@ -39,6 +40,7 @@ pub use image_generation::{ImageGenerationTool, ImageSize};
 pub use homeassistant::HomeAssistantTool;
 pub use mixture_of_agents::MixtureOfAgentsTool;
 pub use skills::SkillsTool;
+pub use rl_training::RLTrainingTool;
 
 use hermes_core::LlmProvider;
 use hermes_memory::SqliteSessionStore;
