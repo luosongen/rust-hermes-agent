@@ -22,3 +22,5 @@ base64 = "0.22"
 sqlx.workspace = true
 tempfile = "3"
 lazy_static = "1"
+serde_yaml = "0.9"
+sha2 = "0.10"
