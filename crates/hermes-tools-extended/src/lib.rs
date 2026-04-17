@@ -21,6 +21,7 @@ pub mod delegate_tool;
 pub mod code_execution;
 pub mod image_generation;
 pub mod transcription;
+pub mod mixture_of_agents;
 
 pub use web_search::{WebSearchTool, SearchResult};
 pub use web_fetch::WebFetchTool;
@@ -34,6 +35,7 @@ pub use delegate_tool::DelegateTool;
 pub use code_execution::CodeExecutionTool;
 pub use image_generation::ImageGenerationTool;
 pub use transcription::TranscriptionTool;
+pub use mixture_of_agents::MixtureOfAgentsTool;
 
 use hermes_core::LlmProvider;
 use hermes_memory::SqliteSessionStore;
@@ -53,4 +55,5 @@ pub fn register_extended_tools(
     registry.register(MemoryTool::new(session_store));
     registry.register(ImageGenerationTool::new());
     registry.register(TranscriptionTool::new());
+    registry.register(MixtureOfAgentsTool::new());
 }
