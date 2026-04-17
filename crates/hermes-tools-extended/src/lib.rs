@@ -22,6 +22,7 @@ pub mod code_execution;
 pub mod image_generation;
 pub mod transcription;
 pub mod homeassistant;
+pub mod mixture_of_agents;
 
 pub use web_search::{WebSearchTool, SearchResult};
 pub use web_fetch::WebFetchTool;
@@ -35,6 +36,7 @@ pub use delegate_tool::DelegateTool;
 pub use code_execution::CodeExecutionTool;
 pub use image_generation::{ImageGenerationTool, ImageSize};
 pub use homeassistant::HomeAssistantTool;
+pub use mixture_of_agents::MixtureOfAgentsTool;
 
 use hermes_core::LlmProvider;
 use hermes_memory::SqliteSessionStore;
@@ -53,4 +55,5 @@ pub fn register_extended_tools(
     registry.register(VisionTool::new(llm_provider));
     registry.register(MemoryTool::new(session_store));
     registry.register(HomeAssistantTool::new());
+    registry.register(MixtureOfAgentsTool::new(std::env::var("OPENROUTER_API_KEY").ok()));
 }
