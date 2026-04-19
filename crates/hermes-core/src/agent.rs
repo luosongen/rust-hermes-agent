@@ -24,7 +24,7 @@
 
 use crate::{
     AgentError, ChatRequest, ConversationRequest, ConversationResponse, LlmProvider, ModelId,
-    Role, ToolContext, ToolDispatcher,
+    NudgeConfig, NudgeService, NudgeState, Role, ToolContext, ToolDispatcher,
 };
 use hermes_memory::{NewMessage, SessionStore};
 use std::sync::Arc;
@@ -58,6 +58,9 @@ pub struct Agent {
     tools: Arc<dyn ToolDispatcher>,
     session_store: Arc<dyn SessionStore>,
     config: AgentConfig,
+    // Nudge system
+    nudge_service: Arc<NudgeService>,
+    nudge_state: NudgeState,
 }
 
 impl Agent {
@@ -81,13 +84,32 @@ impl Agent {
         tools: Arc<dyn ToolDispatcher>,
         session_store: Arc<dyn SessionStore>,
         config: AgentConfig,
+        nudge_config: NudgeConfig,
     ) -> Self {
         Self {
             provider,
             tools,
             session_store,
             config,
+            nudge_service: Arc::new(NudgeService::new(nudge_config)),
+            nudge_state: NudgeState::default(),
         }
+    }
+
+    /// Create Agent with nudge disabled (for subagents to prevent nested nudges)
+    pub fn new_with_nudge_disabled(
+        provider: Arc<dyn LlmProvider>,
+        tools: Arc<dyn ToolDispatcher>,
+        session_store: Arc<dyn SessionStore>,
+        config: AgentConfig,
+    ) -> Self {
+        Self::new(
+            provider,
+            tools,
+            session_store,
+            config,
+            NudgeConfig::disabled(),
+        )
     }
 
     /// Run a conversation
