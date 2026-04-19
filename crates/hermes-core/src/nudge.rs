@@ -10,7 +10,7 @@ pub enum NudgeTrigger {
     Both,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NudgeConfig {
     pub memory_interval: usize,
     pub skill_interval: usize,
@@ -30,6 +30,14 @@ impl NudgeConfig {
         Self {
             memory_interval: 0,
             skill_interval: 0,
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<String> {
+        match key {
+            "memory_interval" => Some(self.memory_interval.to_string()),
+            "skill_interval" => Some(self.skill_interval.to_string()),
+            _ => None,
         }
     }
 }

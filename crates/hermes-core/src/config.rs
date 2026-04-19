@@ -44,6 +44,7 @@
 //! - 凭证被 `credentials.rs` 的 `CredentialPool` 使用
 
 use serde::{Deserialize, Serialize};
+use crate::nudge::NudgeConfig;
 use std::collections::HashMap;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -102,6 +103,8 @@ pub struct Config {
     pub credentials: HashMap<String, String>,
     #[serde(default)]
     pub gateway: GatewayConfig,
+    #[serde(default)]
+    pub nudge: NudgeConfig,
 }
 
 impl Default for DefaultsConfig {
@@ -129,6 +132,7 @@ impl Default for Config {
             defaults: DefaultsConfig::default(),
             credentials: HashMap::new(),
             gateway: GatewayConfig::default(),
+            nudge: NudgeConfig::default(),
         }
     }
 }
@@ -183,6 +187,10 @@ impl Config {
         for (name, platform) in other.gateway.platforms {
             self.gateway.platforms.insert(name, platform);
         }
+        // NudgeConfig merge - only override if non-default
+        if other.nudge != NudgeConfig::default() {
+            self.nudge = other.nudge;
+        }
     }
 
     /// 从 HERMES_* 环境变量加载配置
@@ -219,6 +227,16 @@ impl Config {
                 p.verify_token = Some(val);
             }
         }
+        if let Ok(val) = std::env::var("HERMES_NUDGE_MEMORY_INTERVAL") {
+            if let Ok(interval) = val.parse() {
+                self.nudge.memory_interval = interval;
+            }
+        }
+        if let Ok(val) = std::env::var("HERMES_NUDGE_SKILL_INTERVAL") {
+            if let Ok(interval) = val.parse() {
+                self.nudge.skill_interval = interval;
+            }
+        }
     }
 
     /// 通过键获取配置值（支持点号分隔的嵌套键）
@@ -246,7 +264,12 @@ impl Config {
                     _ => None,
                 })
             }
-            _ => None,
+            _ => {
+                if let Some(val) = self.nudge.get(key) {
+                    return Some(val);
+                }
+                None
+            }
         }
     }
 
