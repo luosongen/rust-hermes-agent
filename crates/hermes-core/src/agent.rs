@@ -24,9 +24,10 @@
 
 use crate::{
     AgentError, ChatRequest, ConversationRequest, ConversationResponse, LlmProvider, ModelId,
-    NudgeConfig, NudgeService, NudgeState, Role, ToolContext, ToolDispatcher,
+    NudgeConfig, NudgeService, NudgeState, NudgeTrigger, Role, ToolContext, ToolDispatcher,
 };
 use hermes_memory::{NewMessage, SessionStore};
+use parking_lot::Mutex;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -60,7 +61,7 @@ pub struct Agent {
     config: AgentConfig,
     // Nudge system
     nudge_service: Arc<NudgeService>,
-    nudge_state: NudgeState,
+    nudge_state: Arc<Mutex<NudgeState>>,
 }
 
 impl Agent {
@@ -92,7 +93,7 @@ impl Agent {
             session_store,
             config,
             nudge_service: Arc::new(NudgeService::new(nudge_config)),
-            nudge_state: NudgeState::default(),
+            nudge_state: Arc::new(Mutex::new(NudgeState::default())),
         }
     }
 
@@ -192,8 +193,48 @@ impl Agent {
                                 crate::Content::Text(result),
                             ));
                         }
+                        // Track tool calls for skill nudge
+                        self.nudge_state.lock().iters_since_skill += tool_calls.len();
                         iterations += 1;
                         continue;
+                    }
+
+                    // ========== Nudge: Check triggers ==========
+                    let trigger = {
+                        let mut nudge_state = self.nudge_state.lock();
+                        self.nudge_service.check_triggers(
+                            &mut nudge_state,
+                            messages.len(),
+                            0,  // no tool calls this turn
+                        )
+                    };
+
+                    if trigger != NudgeTrigger::None {
+                        let prompt = self.nudge_service.get_prompt(trigger);
+
+                        // Spawn background review (fire-and-forget)
+                        // Clone only Send+Sync types for the background task
+                        let provider = self.provider.clone();
+                        let messages_for_review = messages.clone();
+
+                        tokio::spawn(async move {
+                            // Simple review: just send a single chat request
+                            let model_id = ModelId::parse("openai/gpt-4o")
+                                .unwrap_or_else(|| ModelId::new("openai", "gpt-4o"));
+
+                            let chat_request = ChatRequest {
+                                model: model_id,
+                                messages: messages_for_review,
+                                tools: None,  // Review agent has no tools
+                                system_prompt: Some(prompt.to_string()),
+                                temperature: None,
+                                max_tokens: None,
+                            };
+
+                            if let Err(e) = provider.chat(chat_request).await {
+                                tracing::debug!("Background review failed: {}", e);
+                            }
+                        });
                     }
 
                     if let Some(session_id) = &request.session_id {
