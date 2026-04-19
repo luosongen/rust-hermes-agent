@@ -96,11 +96,13 @@ pub async fn run_chat(
         model: model.clone(),
         ..Default::default()
     };
+    let nudge_config = hermes_core::config::Config::load().map(|c| c.nudge).unwrap_or_default();
     let agent = Arc::new(Agent::new(
         provider,
         tool_registry,
         session_store.clone(),
         agent_config,
+        nudge_config,
     ));
 
     // 确定会话 ID
