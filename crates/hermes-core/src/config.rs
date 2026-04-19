@@ -94,6 +94,18 @@ pub struct DefaultsConfig {
     pub tools_enabled: bool,  // 是否启用工具
 }
 
+/// 工具配置结构
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ToolConfig {
+    pub enabled: bool,
+}
+
+impl ToolConfig {
+    pub fn new(enabled: bool) -> Self {
+        Self { enabled }
+    }
+}
+
 /// 主要配置结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -105,6 +117,8 @@ pub struct Config {
     pub gateway: GatewayConfig,
     #[serde(default)]
     pub nudge: NudgeConfig,
+    #[serde(default)]
+    pub tools: HashMap<String, ToolConfig>,
 }
 
 impl Default for DefaultsConfig {
@@ -133,6 +147,7 @@ impl Default for Config {
             credentials: HashMap::new(),
             gateway: GatewayConfig::default(),
             nudge: NudgeConfig::default(),
+            tools: HashMap::new(),
         }
     }
 }
@@ -264,6 +279,7 @@ impl Config {
                     _ => None,
                 })
             }
+            ["tools", name, "enabled"] => self.tools.get(name as &str).map(|t| t.enabled.to_string()),
             _ => {
                 if let Some(val) = self.nudge.get(key) {
                     return Some(val);
@@ -295,6 +311,11 @@ impl Config {
             }
             ["credentials", name] => {
                 self.credentials.insert(name.to_string(), value);
+                true
+            }
+            ["tools", name, "enabled"] => {
+                let enabled = value.parse().unwrap_or(true);
+                self.tools.insert(name.to_string(), ToolConfig::new(enabled));
                 true
             }
             _ => false,

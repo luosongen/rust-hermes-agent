@@ -398,4 +398,34 @@ impl SessionStore for SqliteSessionStore {
 
         Ok(rows.into_iter().map(|r| r.into()).collect())
     }
+
+    async fn list_sessions(
+        &self,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<Session>, StorageError> {
+        let rows: Vec<SessionDbRow> = sqlx::query_as(
+            "SELECT * FROM sessions ORDER BY started_at DESC LIMIT ? OFFSET ?"
+        )
+        .bind(limit as i64)
+        .bind(offset as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StorageError::Query(e.to_string()))?;
+        Ok(rows.into_iter().map(|r| r.into()).collect())
+    }
+
+    async fn delete_session(&self, session_id: &str) -> Result<(), StorageError> {
+        sqlx::query("DELETE FROM messages WHERE session_id = ?")
+            .bind(session_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| StorageError::Query(e.to_string()))?;
+        sqlx::query("DELETE FROM sessions WHERE id = ?")
+            .bind(session_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| StorageError::Query(e.to_string()))?;
+        Ok(())
+    }
 }

@@ -18,13 +18,14 @@
 //!
 //! ## 模块关系
 //! - `commands.rs`: 定义所有 CLI 子命令结构
-//! - `chat.rs`: 交互式聊天的 REPL 实现
+//! - `handlers/`: 命令处理器实现
 
 use clap::Parser;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod commands;
-use commands::Cli;
+mod handlers;
+mod chat;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -33,53 +34,107 @@ async fn main() -> anyhow::Result<()> {
         .with(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    let cli = Cli::parse();
+    let cli = commands::Cli::parse();
 
     match cli.command {
         commands::Commands::Chat {
             model,
             session,
-            no_tools: _,
+            no_tools,
             credentials,
         } => {
-            eprintln!("hermes chat: model={}, session={:?}, credentials={:?}",
-                model, session, credentials);
-            eprintln!("(Agent wiring with RetryingProvider + CredentialPool is ready when the full agent is integrated)");
-            Ok(())
+            crate::chat::run_chat(model, session, no_tools, credentials).await?;
         }
         commands::Commands::Model { command } => {
             match command {
                 commands::ModelCommands::List => {
-                    eprintln!("Available models: openai/gpt-4o, openai/gpt-4-turbo, openai/gpt-3.5-turbo");
+                    handlers::model::list_models()?;
                 }
                 commands::ModelCommands::Set { model } => {
-                    eprintln!("Setting default model to: {}", model);
+                    handlers::model::set_default_model(&model)?;
                 }
                 commands::ModelCommands::Info { model } => {
-                    eprintln!("Model info for: {}", model);
+                    handlers::model::model_info(&model)?;
                 }
             }
-            Ok(())
         }
-        commands::Commands::Session { command: _ } => {
-            eprintln!("Session management: not yet implemented");
-            Ok(())
+        commands::Commands::Session { command } => {
+            match command {
+                commands::SessionCommands::List => {
+                    handlers::session::list_sessions().await?;
+                }
+                commands::SessionCommands::Show { id } => {
+                    handlers::session::show_session(&id).await?;
+                }
+                commands::SessionCommands::Search { query } => {
+                    handlers::session::search_sessions(&query).await?;
+                }
+                commands::SessionCommands::Delete { id } => {
+                    handlers::session::delete_session(&id).await?;
+                }
+            }
         }
-        commands::Commands::Config { command: _ } => {
-            eprintln!("Config management: not yet implemented");
-            Ok(())
+        commands::Commands::Config { command } => {
+            match command {
+                commands::ConfigCommands::Show => {
+                    handlers::config::show_config()?;
+                }
+                commands::ConfigCommands::Get { key } => {
+                    handlers::config::get_config(&key)?;
+                }
+                commands::ConfigCommands::Set { key, value } => {
+                    handlers::config::set_config(&key, &value)?;
+                }
+                commands::ConfigCommands::Edit => {
+                    handlers::config::edit_config()?;
+                }
+            }
         }
-        commands::Commands::Tools { command: _ } => {
-            eprintln!("Tools management: not yet implemented");
-            Ok(())
+        commands::Commands::Tools { command } => {
+            match command {
+                commands::ToolsCommands::List => {
+                    handlers::tools::list_tools()?;
+                }
+                commands::ToolsCommands::Enable { tool } => {
+                    handlers::tools::enable_tool(&tool)?;
+                }
+                commands::ToolsCommands::Disable { tool } => {
+                    handlers::tools::disable_tool(&tool)?;
+                }
+            }
         }
-        commands::Commands::Skills { command: _ } => {
-            eprintln!("Skills management: not yet implemented");
-            Ok(())
+        commands::Commands::Skills { command } => {
+            match command {
+                commands::SkillsCommands::List => {
+                    handlers::skills::list_skills()?;
+                }
+                commands::SkillsCommands::Install { skill } => {
+                    handlers::skills::install_skill(&skill)?;
+                }
+                commands::SkillsCommands::Uninstall { skill } => {
+                    handlers::skills::uninstall_skill(&skill)?;
+                }
+                commands::SkillsCommands::Search { query } => {
+                    handlers::skills::search_skills(&query)?;
+                }
+            }
         }
-        commands::Commands::Gateway { command: _ } => {
-            eprintln!("Gateway management: not yet implemented");
-            Ok(())
+        commands::Commands::Gateway { command } => {
+            match command {
+                commands::GatewayCommands::Start { port } => {
+                    handlers::gateway::start_gateway(port).await?;
+                }
+                commands::GatewayCommands::Stop => {
+                    handlers::gateway::stop_gateway()?;
+                }
+                commands::GatewayCommands::Status => {
+                    handlers::gateway::gateway_status().await?;
+                }
+                commands::GatewayCommands::Setup => {
+                    handlers::gateway::setup_gateway()?;
+                }
+            }
         }
     }
+    Ok(())
 }

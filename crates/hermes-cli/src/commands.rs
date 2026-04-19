@@ -11,10 +11,6 @@
 //! - `ToolsCommands`: 工具管理的子命令（List/Enable/Disable）
 //! - `SkillsCommands`: 技能管理的子命令（List/Install/Uninstall/Search）
 //! - `GatewayCommands`: 网关管理的子命令（Start/Stop/Status/Setup）
-//!
-//! ## 与其他模块的关系
-//! - `main.rs` 使用 `clap::Parser` 解析 `Cli` 结构
-//! - 各子命令的参数在此定义，解析后的值传递给对应的处理逻辑
 
 use clap::{Parser, Subcommand};
 

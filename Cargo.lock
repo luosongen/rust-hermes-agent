@@ -905,12 +905,15 @@ name = "hermes-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
  "clap",
  "dirs",
  "figment",
  "hermes-core",
+ "hermes-gateway",
  "hermes-memory",
  "hermes-provider",
+ "hermes-skills",
  "hermes-tool-registry",
  "hermes-tools-builtin",
  "serde",

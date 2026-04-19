@@ -20,3 +20,6 @@ hermes-memory.workspace = true
 hermes-tool-registry.workspace = true
 hermes-tools-builtin.workspace = true
 hermes-provider = { path = "../hermes-provider" }
+hermes-skills.workspace = true
+hermes-gateway.workspace = true
+axum.workspace = true
