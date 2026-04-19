@@ -69,6 +69,7 @@ pub use agent::AgentConfig;
 pub use conversation::*;
 pub use gateway::*;
 pub use hermes_memory::SessionStore;
+pub use nudge::{NudgeConfig, NudgeService, NudgeState, NudgeTrigger};
 
 #[cfg(test)]
 mod tests;
