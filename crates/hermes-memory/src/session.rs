@@ -109,4 +109,7 @@ pub trait SessionStore: Send + Sync {
     async fn search_messages(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>, StorageError>;
     async fn list_sessions(&self, limit: usize, offset: usize) -> Result<Vec<Session>, StorageError>;
     async fn delete_session(&self, session_id: &str) -> Result<(), StorageError>;
+    async fn update_session(&self, session: &Session) -> Result<(), StorageError>;
+    async fn get_session_stats(&self, session_id: &str) -> Result<Option<(usize, usize, usize)>, StorageError>;
+    async fn search_sessions_by_model(&self, model: &str, limit: usize) -> Result<Vec<Session>, StorageError>;
 }

@@ -1,5 +1,6 @@
 use clap::Parser;
 use hermes_cli::{chat, Cli, Commands, GatewayCommands};
+use hermes_cli::handlers::{gateway, model, session, skills, tools};
 use hermes_core::config::{Config, config_file};
 
 #[tokio::main]
@@ -18,10 +19,19 @@ async fn main() -> anyhow::Result<()> {
             chat::run_chat(model, session, no_tools, credentials).await?;
         }
         Commands::Model { command } => {
-            println!("Model command: {:?}", command);
+            match command {
+                hermes_cli::ModelCommands::List => model::list_models()?,
+                hermes_cli::ModelCommands::Set { model } => model::set_default_model(&model)?,
+                hermes_cli::ModelCommands::Info { model } => model::model_info(&model)?,
+            }
         }
         Commands::Session { command } => {
-            println!("Session command: {:?}", command);
+            match command {
+                hermes_cli::SessionCommands::List => session::list_sessions().await?,
+                hermes_cli::SessionCommands::Show { id } => session::show_session(&id).await?,
+                hermes_cli::SessionCommands::Search { query } => session::search_sessions(&query).await?,
+                hermes_cli::SessionCommands::Delete { id } => session::delete_session(&id).await?,
+            }
         }
         Commands::Config { command } => {
             match command {
@@ -55,59 +65,41 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Commands::Tools { command } => {
-            println!("Tools command: {:?}", command);
+            match command {
+                hermes_cli::ToolsCommands::List => tools::list_tools()?,
+                hermes_cli::ToolsCommands::Enable { tool } => tools::enable_tool(&tool)?,
+                hermes_cli::ToolsCommands::Disable { tool } => tools::disable_tool(&tool)?,
+            }
         }
         Commands::Skills { command } => {
-            println!("Skills command: {:?}", command);
+            match command {
+                hermes_cli::SkillsCommands::List => skills::list_skills()?,
+                hermes_cli::SkillsCommands::Search { query } => skills::search_skills(&query)?,
+                hermes_cli::SkillsCommands::Install { skill } => skills::install_skill(&skill)?,
+                hermes_cli::SkillsCommands::Uninstall { skill } => skills::uninstall_skill(&skill)?,
+            }
         }
         Commands::Gateway {
             command: GatewayCommands::Start { port },
         } => {
-            start_gateway(port).await?;
+            gateway::start_gateway(port).await?;
         }
         Commands::Gateway {
             command: GatewayCommands::Stop,
         } => {
-            println!("Stop gateway - TODO");
+            gateway::stop_gateway()?;
         }
         Commands::Gateway {
             command: GatewayCommands::Status,
         } => {
-            println!("Gateway status - TODO");
+            gateway::gateway_status().await?;
         }
         Commands::Gateway {
             command: GatewayCommands::Setup,
         } => {
-            println!("Gateway setup - TODO");
+            gateway::setup_gateway()?;
         }
     }
 
     Ok(())
-}
-
-async fn start_gateway(_port: u16) -> anyhow::Result<()> {
-    // NOTE: Full gateway startup requires provider + credentials setup.
-    // This will be completed once the provider infrastructure is ready.
-    // For now, the gateway can be started programmatically:
-    //
-    // ```rust,ignore
-    // use hermes_core::Agent;
-    // use hermes_gateway::{Gateway, TelegramAdapter};
-    // use hermes_memory::SqliteStore;
-    // use std::sync::Arc;
-    //
-    // let store = SqliteStore::new("hermes.db")?;
-    // let agent = Arc::new(Agent::new(...));
-    // let gateway = Arc::new(Gateway::new(agent));
-    // let adapter = Arc::new(TelegramAdapter::new(bot_token, verify_token));
-    // gateway.register_adapter(adapter);
-    // let app = gateway.router();
-    // axum::Server::bind(&addr).serve(app).await?;
-    // ```
-
-    anyhow::bail!(
-        "Gateway start requires provider setup. Set TELEGRAM_BOT_TOKEN, \
-         TELEGRAM_VERIFY_TOKEN env vars and ensure credentials are configured. \
-         Gateway infrastructure (provider manager) is still being finalized."
-    );
 }

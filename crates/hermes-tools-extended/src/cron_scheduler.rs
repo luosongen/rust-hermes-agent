@@ -4,12 +4,16 @@
 
 use async_trait::async_trait;
 use hermes_core::{ToolContext, ToolError};
-use hermes_tool_registry::Tool;
+use hermes_tool_registry::{Tool, ToolRegistry};
 use serde_json::json;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::task::JoinHandle;
 use parking_lot::RwLock;
+use tracing;
+use chrono;
 
 /// 定时任务结构
 #[derive(Debug, Clone, serde::Serialize)]
@@ -24,6 +28,8 @@ pub struct ScheduledJob {
 pub struct CronScheduler {
     jobs: Arc<RwLock<HashMap<String, ScheduledJob>>>,
     counter: Arc<RwLock<u64>>,
+    tool_registry: Option<Arc<ToolRegistry>>,
+    runner_handle: Option<JoinHandle<()>>,
 }
 
 impl CronScheduler {
@@ -31,6 +37,89 @@ impl CronScheduler {
         Self {
             jobs: Arc::new(RwLock::new(HashMap::new())),
             counter: Arc::new(RwLock::new(0)),
+            tool_registry: None,
+            runner_handle: None,
+        }
+    }
+
+    /// 设置工具注册表，用于执行任务
+    pub fn set_tool_registry(&mut self, registry: Arc<ToolRegistry>) {
+        self.tool_registry = Some(registry);
+    }
+
+    /// 启动任务执行循环
+    pub fn start(&mut self) {
+        // 避免重复启动
+        if self.runner_handle.is_some() {
+            return;
+        }
+
+        let jobs = self.jobs.clone();
+        let tool_registry = self.tool_registry.clone();
+
+        self.runner_handle = Some(tokio::spawn(async move {
+            let mut last_check = Instant::now();
+            
+            loop {
+                // 每秒钟检查一次
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                
+                let now = Instant::now();
+                if now.duration_since(last_check) < Duration::from_secs(1) {
+                    continue;
+                }
+                last_check = now;
+
+                // 检查并执行任务
+                if let Some(registry) = &tool_registry {
+                    let jobs = jobs.read();
+                    
+                    for job in jobs.values() {
+                        // 标准化cron表达式
+                        let normalized = if job.cron_expression.split_whitespace().count() == 5 {
+                            format!("0 {}", job.cron_expression)
+                        } else {
+                            job.cron_expression.clone()
+                        };
+
+                        // 解析cron表达式
+                        if let Ok(schedule) = cron::Schedule::from_str(&normalized) {
+                            // 检查是否到了执行时间
+                            let now = chrono::Utc::now();
+                            if schedule.upcoming(chrono::Utc).next() == Some(now) {
+                                // 执行任务
+                                let registry_clone = registry.clone();
+                                let job_clone = job.clone();
+                                
+                                tokio::spawn(async move {
+                                    if let Some(tool) = registry_clone.get(&job_clone.tool_name) {
+                                        let context = ToolContext {
+                                            session_id: format!("cron_{}", job_clone.id),
+                                            working_directory: std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/")),
+                                            user_id: None,
+                                            task_id: None,
+                                        };
+
+                                        match tool.execute(job_clone.tool_args.clone(), context).await {
+                                            Ok(_) => tracing::info!("Cron job executed successfully: {}", job_clone.id),
+                                            Err(e) => tracing::error!("Cron job execution failed: {} - {:?}", job_clone.id, e),
+                                        }
+                                    } else {
+                                        tracing::error!("Tool not found for cron job: {} - {}", job_clone.id, job_clone.tool_name);
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }));
+    }
+
+    /// 停止任务执行循环
+    pub fn stop(&mut self) {
+        if let Some(handle) = self.runner_handle.take() {
+            handle.abort();
         }
     }
 

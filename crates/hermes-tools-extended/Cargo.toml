@@ -24,3 +24,5 @@ tempfile = "3"
 lazy_static = "1"
 serde_yaml = "0.9"
 sha2 = "0.10"
+tracing.workspace = true
+chrono.workspace = true

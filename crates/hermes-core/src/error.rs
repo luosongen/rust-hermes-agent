@@ -45,6 +45,32 @@ pub enum AgentError {
     AuthenticationFailed,
     #[error("Billing error: {0}")]
     BillingError(String),
+    #[error("Configuration error: {0}")]
+    ConfigurationError(String),
+    #[error("Timeout error: {0}")]
+    TimeoutError(String),
+    #[error("Network error: {0}")]
+    NetworkError(String),
+}
+
+impl AgentError {
+    /// Returns true if this error is transient and worth retrying.
+    pub fn is_retryable(&self) -> bool {
+        match self {
+            AgentError::Provider(err) => err.is_retryable(),
+            AgentError::NetworkError(_) => true,
+            AgentError::TimeoutError(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Returns the suggested retry-after seconds, if known.
+    pub fn retry_after_secs(&self) -> Option<u64> {
+        match self {
+            AgentError::Provider(err) => err.retry_after_secs(),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Error, Debug)]

@@ -75,6 +75,13 @@ impl RetryingProvider {
                         err
                     );
 
+                    // 检查凭证是否被限流
+                    if matches!(err, ProviderError::RateLimit(_)) {
+                        if let ProviderError::RateLimit(secs) = err {
+                            self.pool.report_rate_limit(credential_name, secs);
+                        }
+                    }
+
                     sleep(delay).await;
                     attempt += 1;
                 }

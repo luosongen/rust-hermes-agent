@@ -881,6 +881,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "hermes-acp"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "hermes-core",
+ "hermes-memory",
+ "hermes-provider",
+ "hermes-tool-registry",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "hermes-agent"
 version = "0.1.0"
 dependencies = [
@@ -1116,6 +1134,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "base64",
+ "chrono",
  "cron",
  "hermes-core",
  "hermes-memory",
@@ -1133,6 +1152,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
+ "tracing",
  "urlencoding",
 ]
 

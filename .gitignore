@@ -3,3 +3,6 @@
 .omc/
 *.lock
 !Cargo.lock
+hermes.db
+Cargo.lock
+Cargo.lock

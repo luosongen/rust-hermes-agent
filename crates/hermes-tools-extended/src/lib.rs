@@ -48,13 +48,19 @@ use hermes_tool_registry::ToolRegistry;
 use std::sync::Arc;
 
 pub fn register_extended_tools(
-    registry: &ToolRegistry,
+    registry: Arc<ToolRegistry>,
     llm_provider: Arc<dyn LlmProvider>,
     session_store: Arc<SqliteSessionStore>,
 ) {
     registry.register(WebSearchTool::new());
     registry.register(WebFetchTool::new());
-    registry.register(CronScheduler::new());
+    
+    // 创建并配置 CronScheduler
+    let mut cron_scheduler = CronScheduler::new();
+    cron_scheduler.set_tool_registry(Arc::clone(&registry));
+    cron_scheduler.start();
+    registry.register(cron_scheduler);
+    
     registry.register(CliExecutor::new(ExecutorConfig::default()));
     registry.register(VisionTool::new(llm_provider));
     registry.register(MemoryTool::new(session_store));

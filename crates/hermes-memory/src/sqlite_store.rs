@@ -428,4 +428,74 @@ impl SessionStore for SqliteSessionStore {
             .map_err(|e| StorageError::Query(e.to_string()))?;
         Ok(())
     }
+
+    async fn update_session(&self, session: &Session) -> Result<(), StorageError> {
+        sqlx::query(
+            r#"UPDATE sessions SET 
+               source = ?, user_id = ?, model = ?, model_config = ?, system_prompt = ?, 
+               parent_session_id = ?, ended_at = ?, end_reason = ?, 
+               message_count = ?, tool_call_count = ?, 
+               input_tokens = ?, output_tokens = ?, cache_read_tokens = ?, 
+               cache_write_tokens = ?, reasoning_tokens = ?, 
+               billing_provider = ?, billing_base_url = ?, billing_mode = ?, 
+               estimated_cost_usd = ?, actual_cost_usd = ?, 
+               title = ?, metadata = ? 
+               WHERE id = ?"#
+        )
+        .bind(&session.source)
+        .bind(&session.user_id)
+        .bind(&session.model)
+        .bind(&session.model_config)
+        .bind(&session.system_prompt)
+        .bind(&session.parent_session_id)
+        .bind(&session.ended_at)
+        .bind(&session.end_reason)
+        .bind(session.message_count as i64)
+        .bind(session.tool_call_count as i64)
+        .bind(session.input_tokens as i64)
+        .bind(session.output_tokens as i64)
+        .bind(session.cache_read_tokens as i64)
+        .bind(session.cache_write_tokens as i64)
+        .bind(session.reasoning_tokens as i64)
+        .bind(&session.billing_provider)
+        .bind(&session.billing_base_url)
+        .bind(&session.billing_mode)
+        .bind(&session.estimated_cost_usd)
+        .bind(&session.actual_cost_usd)
+        .bind(&session.title)
+        .bind(&session.metadata)
+        .bind(&session.id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StorageError::Query(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn get_session_stats(&self, session_id: &str) -> Result<Option<(usize, usize, usize)>, StorageError> {
+        let row: Option<(i64, i64, i64)> = sqlx::query_as(
+            "SELECT message_count, input_tokens, output_tokens FROM sessions WHERE id = ?"
+        )
+        .bind(session_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| StorageError::Query(e.to_string()))?;
+
+        Ok(row.map(|(msg_count, input_tokens, output_tokens)| (
+            msg_count as usize,
+            input_tokens as usize,
+            output_tokens as usize
+        )))
+    }
+
+    async fn search_sessions_by_model(&self, model: &str, limit: usize) -> Result<Vec<Session>, StorageError> {
+        let rows: Vec<SessionDbRow> = sqlx::query_as(
+            "SELECT * FROM sessions WHERE model LIKE ? ORDER BY started_at DESC LIMIT ?"
+        )
+        .bind(format!("%{model}%"))
+        .bind(limit as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StorageError::Query(e.to_string()))?;
+        Ok(rows.into_iter().map(|r| r.into()).collect())
+    }
 }

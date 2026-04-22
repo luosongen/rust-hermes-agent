@@ -156,7 +156,7 @@ impl Agent {
                 .unwrap_or_else(|| ModelId::new("openai", "gpt-4o"));
 
             let chat_request = ChatRequest {
-                model: model_id,
+                model: model_id.clone(),
                 messages: messages.clone(),
                 tools: Some(self.tools.get_definitions()),
                 system_prompt: request.system_prompt.clone(),
@@ -164,6 +164,7 @@ impl Agent {
                 max_tokens: self.config.max_tokens,
             };
 
+            // 使用智能路由
             let response = self
                 .provider
                 .chat(chat_request)
@@ -271,9 +272,24 @@ impl Agent {
                     });
                 }
                 crate::FinishReason::Length => {
-                    return Err(AgentError::Internal(
-                        "Context length exceeded — compression not yet implemented".to_string(),
-                    ));
+                    // 尝试使用上下文压缩
+                    let mut compressor = crate::ContextCompressor::new(
+                        self.provider.clone(),
+                        self.config.model.clone(),
+                        self.provider.context_length(&model_id).unwrap_or(4096),
+                    );
+                    
+                    match compressor.compress(messages.clone(), None, None).await {
+                        Ok(compressed_messages) => {
+                            messages = compressed_messages;
+                            continue;
+                        }
+                        Err(e) => {
+                            return Err(AgentError::Internal(
+                                format!("Context length exceeded and compression failed: {}", e),
+                            ));
+                        }
+                    }
                 }
                 crate::FinishReason::ContentFilter => {
                     return Err(AgentError::ContentFiltered);

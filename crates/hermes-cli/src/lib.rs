@@ -19,5 +19,6 @@
 
 pub mod chat;
 pub mod commands;
+pub mod handlers;
 
 pub use commands::*;
