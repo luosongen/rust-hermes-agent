@@ -21,6 +21,8 @@
 //! - 默认从 `~/.hermes/skills` 和 `./skills` 目录加载
 
 pub mod error;
+pub mod hub;
+pub mod hub_cli;
 pub mod fuzzy_patch;
 pub mod loader;
 pub mod metadata;
@@ -36,4 +38,8 @@ pub use loader::{CodeBlock, Skill, SkillLoader};
 pub use metadata::{HermesMetadata, SkillConfigItem, SkillMetadata};
 pub use registry::SkillRegistry;
 pub use security::{SecurityScanResult, SecurityThreat, scan_content};
+pub use hub::{HubClient, HubError, HubConfig, HubSource, SkillIndex, SkillIndexEntry, Category};
+pub use hub::{MarketClient, Installer, Sync, Browse};
+pub use hub::{SecurityScanner, Severity, ThreatType};
+pub use hub_cli::{HubCli, HubCommand, run_hub_command};
 pub use tools::{skills_list, skills_view, skills_manage, SkillListItem, SkillViewResult, SkillsListArgs, SkillsViewArgs, SkillsManageArgs};

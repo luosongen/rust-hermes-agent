@@ -7,14 +7,17 @@ pub enum HubError {
     #[error("Skill not found: {0}")]
     SkillNotFound(String),
 
-    #[error("Already installed: {0}")]
+    #[error("Skill already installed: {0}")]
     AlreadyInstalled(String),
 
     #[error("Download failed: {0}")]
     DownloadFailed(String),
 
-    #[error("Security blocked: {skill} ({threats_len} threats)")]
-    SecurityBlocked { skill: String, threats_len: usize },
+    #[error("Security blocked: {skill} - found {threats_len} threat(s)")]
+    SecurityBlocked {
+        skill: String,
+        threats_len: usize,
+    },
 
     #[error("Sync failed: {0}")]
     SyncFailed(String),
