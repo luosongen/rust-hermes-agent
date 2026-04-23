@@ -42,4 +42,7 @@ pub enum SkillError {
 
     #[error("Skill is disabled on this platform: {0}")]
     PlatformNotSupported(String),
+
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }

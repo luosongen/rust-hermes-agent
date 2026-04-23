@@ -172,4 +172,32 @@ impl SkillLoader {
         }
         dirs
     }
+
+    /// Parse skill content without writing to disk.
+    /// Used by skills_manage tool to create skills from content strings.
+    pub fn parse_skill_content(name: &str, content: &str) -> Result<Skill, SkillError> {
+        // Prepend minimal frontmatter if content doesn't have it
+        let full_content = if content.trim().starts_with("---") {
+            content.to_string()
+        } else {
+            format!(
+                "---\nname: {}\ndescription: \n---\n{}",
+                name,
+                content
+            )
+        };
+        let (frontmatter, body) = Skill::parse_frontmatter(&full_content)?;
+        let metadata: SkillMetadata =
+            serde_yaml::from_str(&frontmatter)
+                .map_err(|e| SkillError::ParseFrontmatter(e.to_string()))?;
+        let code_blocks = Skill::extract_code_blocks(&body);
+        let examples = Skill::extract_examples(&body);
+        Ok(Skill {
+            metadata,
+            content: body,
+            code_blocks,
+            examples,
+            path: PathBuf::new(),
+        })
+    }
 }

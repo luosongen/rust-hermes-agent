@@ -78,6 +78,22 @@ impl SkillRegistry {
     pub fn is_empty(&self) -> bool {
         self.by_name.is_empty()
     }
+
+    /// List all skills in the registry.
+    pub fn list(&self) -> Vec<&Skill> {
+        self.by_name.values().collect()
+    }
+
+    /// Update an existing skill (replaces if exists).
+    pub fn update(&mut self, skill: Skill) {
+        let name = skill.metadata.name.clone();
+        self.by_name.insert(name, skill);
+    }
+
+    /// Unregister a skill by name.
+    pub fn unregister(&mut self, name: &str) -> Option<Skill> {
+        self.by_name.remove(name)
+    }
 }
 
 impl Default for SkillRegistry {

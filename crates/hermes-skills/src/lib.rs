@@ -25,6 +25,7 @@ pub mod fuzzy_patch;
 pub mod loader;
 pub mod metadata;
 pub mod registry;
+pub mod tools;
 
 #[cfg(test)]
 mod tests;
@@ -33,3 +34,4 @@ pub use error::SkillError;
 pub use loader::{CodeBlock, Skill, SkillLoader};
 pub use metadata::{HermesMetadata, SkillConfigItem, SkillMetadata};
 pub use registry::SkillRegistry;
+pub use tools::{skills_list, skills_view, skills_manage, SkillListItem, SkillViewResult, SkillsListArgs, SkillsViewArgs, SkillsManageArgs};
