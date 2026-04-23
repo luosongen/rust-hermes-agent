@@ -25,6 +25,7 @@
 //! 当前唯一实现是 `SqliteSessionStore`（见 `sqlite_store.rs`），它使用 SQLite
 //! 存储会话和消息，并通过 FTS5 虚拟表支持全文搜索。
 
+pub mod builtin;
 pub mod session;
 pub mod sqlite_store;
 pub mod memory_manager;
@@ -32,3 +33,4 @@ pub mod memory_manager;
 pub use sqlite_store::SqliteSessionStore;
 pub use session::*;
 pub use memory_manager::{MemoryManager, MemoryProvider};
+pub use builtin::BuiltinMemoryProvider;
