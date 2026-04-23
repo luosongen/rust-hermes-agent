@@ -1,6 +1,14 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 基础交互规则
+
+### 沟通约定
+
+1. **语言要求**：所有回答与讨论使用**中文**。
+2. **解释性注释**：生成的代码中，关键节点和复杂逻辑处需添加**中文注释**。
+3. **代码聚合**：当生成代码超过20行时，主动提示考虑模块化或重构，评估代码颗粒度是否合适。
+
 
 **权衡说明**：这些准则更偏向谨慎而非速度。处理简单任务时请自行判断。
 
