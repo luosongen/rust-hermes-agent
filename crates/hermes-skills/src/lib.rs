@@ -21,6 +21,7 @@
 //! - 默认从 `~/.hermes/skills` 和 `./skills` 目录加载
 
 pub mod error;
+pub mod hub;
 pub mod fuzzy_patch;
 pub mod loader;
 pub mod metadata;

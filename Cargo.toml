@@ -48,6 +48,7 @@ hermes-platform-telegram = { path = "crates/hermes-platform-telegram" }
 hermes-platform-wecom = { path = "crates/hermes-platform-wecom" }
 hermes-environment = { path = "crates/hermes-environment" }
 serde-xml-rs = "0.6"
+rusqlite = { version = "0.32", features = ["bundled"] }
 sha2 = "0.10"
 base64 = "0.22"
 aes = "0.8"

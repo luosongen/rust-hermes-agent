@@ -1,48 +1,53 @@
-//! 技能模块错误类型定义
-//!
-//! 定义了技能加载、注册、执行过程中可能出现的所有错误。
-//!
-//! ## 错误类型
-//! - `Io`: IO 错误（文件读取失败等），自动从 `std::io::Error` 转换
-//! - `ParseFrontmatter`: frontmatter 解析错误（缺少分隔符、无效 YAML 等）
-//! - `Yaml`: YAML 解析错误
-//! - `NotFound`: 技能未找到
-//! - `AlreadyExists`: 注册时发现同名技能已存在
-//! - `InvalidPath`: 无效的技能文件路径
-//! - `Download`: 技能下载失败
-//! - `PlatformNotSupported`: 技能不支持当前平台
-//!
-//! ## 使用方式
-//! 使用 `thiserror` 派生 `Error` trait，支持 `?` 运算符自动传播。
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum SkillError {
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("Failed to parse frontmatter: {0}")]
-    ParseFrontmatter(String),
-
-    #[error("YAML parse error: {0}")]
-    Yaml(#[from] serde_yaml::Error),
-
+pub enum HubError {
     #[error("Skill not found: {0}")]
-    NotFound(String),
+    SkillNotFound(String),
 
-    #[error("Skill already exists: {0}")]
-    AlreadyExists(String),
-
-    #[error("Invalid skill path: {0}")]
-    InvalidPath(String),
+    #[error("Skill already installed: {0}")]
+    AlreadyInstalled(String),
 
     #[error("Download failed: {0}")]
-    Download(String),
+    DownloadFailed(String),
 
-    #[error("Skill is disabled on this platform: {0}")]
-    PlatformNotSupported(String),
+    #[error("Security blocked: {skill} - found {threats_len} threat(s)")]
+    SecurityBlocked {
+        skill: String,
+        threats_len: usize,
+    },
 
-    #[error("Invalid input: {0}")]
-    InvalidInput(String),
+    #[error("Sync failed: {0}")]
+    SyncFailed(String),
+
+    #[error("Index error: {0}")]
+    IndexError(String),
+
+    #[error("Install failed: {0}")]
+    InstallFailed(String),
+
+    #[error("Market API error: {0}")]
+    MarketApiError(String),
+
+    #[error("Parse error: {0}")]
+    ParseError(String),
+
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("SQLite error: {0}")]
+    SqliteError(#[from] rusqlite::Error),
+
+    #[error("Reqwest error: {0}")]
+    ReqwestError(#[from] reqwest::Error),
+}
+
+impl HubError {
+    pub fn exit_code(&self) -> i32 {
+        match self {
+            HubError::SkillNotFound(_) => 3,
+            HubError::SecurityBlocked { .. } => 2,
+            _ => 1,
+        }
+    }
 }
