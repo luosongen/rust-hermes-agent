@@ -12,7 +12,7 @@ fn test_skills_list_empty() {
 #[test]
 fn test_skills_view_not_found() {
     let registry = SkillRegistry::new();
-    let args = SkillsViewArgs { name: "nonexistent".to_string() };
+    let args = SkillsViewArgs { name: "nonexistent".to_string(), file_path: None };
     let result = skills_view(&registry, args);
     assert!(result.is_err());
 }
@@ -81,7 +81,7 @@ View content here."#;
     };
     skills_manage(&mut registry, temp_dir.path(), create_args).unwrap();
 
-    let view_args = SkillsViewArgs { name: "view-test".to_string() };
+    let view_args = SkillsViewArgs { name: "view-test".to_string(), file_path: None };
     let result = skills_view(&registry, view_args);
     assert!(result.is_ok());
     let view = result.unwrap();
@@ -119,7 +119,55 @@ Delete me."#;
     let result = skills_manage(&mut registry, temp_dir.path(), delete_args);
     assert!(result.is_ok());
 
-    let view_args = SkillsViewArgs { name: "delete-me".to_string() };
+    let view_args = SkillsViewArgs { name: "delete-me".to_string(), file_path: None };
     let result = skills_view(&registry, view_args);
     assert!(result.is_err());
+}
+
+#[test]
+fn test_skills_manage_patch() {
+    let mut registry = SkillRegistry::new();
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    let content = r#"---
+name: patch-test
+description: A skill for patching
+---
+fn hello() {
+    println!("Hello World");
+}"#;
+
+    let create_args = SkillsManageArgs {
+        action: "create".to_string(),
+        name: "patch-test".to_string(),
+        content: Some(content.to_string()),
+        old_string: None,
+        new_string: None,
+    };
+    skills_manage(&mut registry, temp_dir.path(), create_args).unwrap();
+
+    // Verify initial content
+    let result = skills_view(&registry, SkillsViewArgs { name: "patch-test".to_string(), file_path: None });
+    assert!(result.is_ok());
+    let view = result.unwrap();
+    assert!(view.content.contains("Hello World"));
+
+    // Patch the content
+    let patch_args = SkillsManageArgs {
+        action: "patch".to_string(),
+        name: "patch-test".to_string(),
+        content: None,
+        old_string: Some("Hello World".to_string()),
+        new_string: Some("Hello Rust".to_string()),
+    };
+    let result = skills_manage(&mut registry, temp_dir.path(), patch_args);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), "Skill 'patch-test' patched");
+
+    // Verify patched content
+    let result = skills_view(&registry, SkillsViewArgs { name: "patch-test".to_string(), file_path: None });
+    assert!(result.is_ok());
+    let view = result.unwrap();
+    assert!(view.content.contains("Hello Rust"));
+    assert!(!view.content.contains("Hello World"));
 }

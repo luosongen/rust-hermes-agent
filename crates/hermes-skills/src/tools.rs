@@ -19,6 +19,7 @@ pub struct SkillsListArgs {
 #[derive(Debug, Deserialize)]
 pub struct SkillsViewArgs {
     pub name: String,
+    pub file_path: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,6 +35,7 @@ pub struct SkillsManageArgs {
 pub struct SkillListItem {
     pub name: String,
     pub description: String,
+    pub category: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -44,13 +46,21 @@ pub struct SkillViewResult {
 }
 
 /// Tool: skills_list - List all available skills
-pub fn skills_list(registry: &SkillRegistry, _args: SkillsListArgs) -> Result<Vec<SkillListItem>, SkillError> {
+pub fn skills_list(registry: &SkillRegistry, args: SkillsListArgs) -> Result<Vec<SkillListItem>, SkillError> {
     let skills = registry.list();
     let mut items: Vec<SkillListItem> = skills
         .iter()
+        .filter(|s| {
+            if let Some(ref cat) = args.category {
+                s.metadata.platforms.iter().any(|p| p == cat)
+            } else {
+                true
+            }
+        })
         .map(|s| SkillListItem {
             name: s.metadata.name.clone(),
             description: s.metadata.description.clone(),
+            category: s.metadata.platforms.join(","),
         })
         .collect();
     items.sort_by(|a, b| a.name.cmp(&b.name));
