@@ -8,7 +8,7 @@ use crate::hub::error::HubError;
 use crate::hub::types::{Category, SkillIndexEntry, SkillSource};
 
 pub struct SkillIndex {
-    conn: Arc<Mutex<Connection>>,
+    pub conn: Arc<Mutex<Connection>>,
 }
 
 impl SkillIndex {
