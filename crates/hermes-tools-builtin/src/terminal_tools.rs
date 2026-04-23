@@ -46,6 +46,7 @@ use std::time::Duration;
 ///
 /// # 安全说明
 /// - 命令按空白字符拆分，不支持 shell 管道、重定向等复杂语法
+/// - 自动检测危险命令并拒绝执行（无需审批工具介入）
 /// - 相对路径基于 `context.working_directory` 解析
 #[derive(Clone)]
 pub struct TerminalTool {
@@ -56,6 +57,40 @@ impl TerminalTool {
     /// 创建新的 TerminalTool 实例
     pub fn new(environment: Arc<dyn Environment>) -> Self {
         Self { environment }
+    }
+
+    /// 检查命令是否包含危险模式，返回 (是否危险, 原因)
+    fn check_dangerous(command: &str) -> Option<String> {
+        use regex::Regex;
+
+        let patterns: Vec<(Regex, &str)> = vec![
+            (Regex::new(r"\brm\s+(-[^\s]*\s*)*/").unwrap(), "delete in root path"),
+            (Regex::new(r"\brm\s+-[^\s]*[rf]").unwrap(), "recursive or force delete"),
+            (Regex::new(r"\brmdir\b").unwrap(), "remove directories"),
+            (Regex::new(r"\bchmod\s+(-[^\s]*\s*)*(777|666|o\+[rwx]*w|a\+[rwx]*w)").unwrap(), "world-writable permissions"),
+            (Regex::new(r"\bcurl\s+.*\|\s*bash").unwrap(), "pipe to bash (curl | bash)"),
+            (Regex::new(r"\bwget\s+.*\|\s*bash").unwrap(), "pipe to bash (wget | bash)"),
+            (Regex::new(r"\bsudo\s+su\b").unwrap(), "sudo su"),
+            (Regex::new(r"\bsu\s+-\s*root").unwrap(), "switch to root"),
+            (Regex::new(r"\btee\s+.*/etc/").unwrap(), "write to system directory"),
+            (Regex::new(r"\bcat\s+.*>\s*/etc/").unwrap(), "redirect to system file"),
+            (Regex::new(r"\biptables\s+(-[^\s]*\s*)*F").unwrap(), "flush iptables rules"),
+            (Regex::new(r"\bufw\s+disable").unwrap(), "disable firewall"),
+            (Regex::new(r"\bpkill\s+(-[^\s]*\s*)*-9").unwrap(), "force kill process"),
+            (Regex::new(r"\bkillall\b").unwrap(), "kill all processes"),
+            (Regex::new(r"\bmkfs\b").unwrap(), "format filesystem"),
+            (Regex::new(r"\bdd\s+.*of=/dev/").unwrap(), "direct disk write"),
+            (Regex::new(r"\bsystemctl\s+(stop|disable).*").unwrap(), "stop/disable service"),
+            (Regex::new(r"\bmv\s+.*\s+/").unwrap(), "move to root"),
+            (Regex::new(r"\bcp\s+.*\s+/").unwrap(), "copy to root"),
+        ];
+
+        for (re, reason) in patterns {
+            if re.is_match(command) {
+                return Some(reason.to_string());
+            }
+        }
+        None
     }
 }
 
@@ -95,6 +130,13 @@ impl hermes_tool_registry::Tool for TerminalTool {
         let command = args["command"]
             .as_str()
             .ok_or_else(|| ToolError::InvalidArgs("command must be string".into()))?;
+
+        // Security: auto-check dangerous commands before execution
+        if let Some(reason) = Self::check_dangerous(command) {
+            return Err(ToolError::PermissionDenied(
+                format!("Dangerous command blocked: {}. Reason: {}. Use 'approval' tool if you need to whitelist this command.", command, reason)
+            ));
+        }
 
         let timeout_secs = args["timeout"].as_i64().unwrap_or(30);
         let timeout = Duration::from_secs(timeout_secs as u64);

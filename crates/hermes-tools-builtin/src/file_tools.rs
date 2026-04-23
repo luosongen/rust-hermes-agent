@@ -23,8 +23,65 @@ use async_trait::async_trait;
 use hermes_core::{ToolContext, ToolError};
 use hermes_environment::{Environment, EnvironmentError};
 use serde_json::json;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+/// 路径安全检查：验证路径是否在工作目录范围内
+///
+/// 防止路径遍历攻击，确保解析后的路径不会跳出允许的工作目录。
+pub fn validate_path_within_workdir(path: &Path, workdir: &Path) -> Result<PathBuf, ToolError> {
+    // 获取绝对路径
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        workdir.join(path)
+    };
+
+    // 规范化路径（解析 . 和 ..）
+    let canonical = absolute
+        .components()
+        .fold(PathBuf::new(), |mut acc, c| {
+            match c {
+                std::path::Component::Normal(p) => acc.push(p),
+                std::path::Component::RootDir => acc.push("/"),
+                std::path::Component::Prefix(prefix) => acc.push(prefix.as_os_str()),
+                std::path::Component::CurDir => {} // skip .
+                std::path::Component::ParentDir => {
+                    // 处理 ..，尝试弹出一级
+                    if !acc.pop() {
+                        // 如果已经在根目录还向上，可能是攻击
+                        tracing::warn!("[PathSecurity] Path traversal attempt blocked: {:?}", path);
+                    }
+                }
+            }
+            acc
+        });
+
+    // 检查是否超出工作目录
+    let workdir_canonical = if let Ok(cwd) = std::env::current_dir() {
+        cwd.join(workdir)
+    } else {
+        workdir.to_path_buf()
+    };
+
+    // 对敏感目录的额外保护
+    let sensitive_prefixes = [
+        "/etc", "/usr", "/bin", "/sbin", "/lib", "/lib64",
+        "/opt", "/sys", "/proc", "/dev", "/boot", "/root",
+        ".ssh", ".aws", ".docker", ".kube",
+    ];
+
+    let path_str = canonical.to_string_lossy();
+    for prefix in &sensitive_prefixes {
+        if path_str.starts_with(prefix) || path_str.contains(&format!("/{}/", prefix)) {
+            return Err(ToolError::PermissionDenied(
+                format!("Access to sensitive path '{}' is not allowed", canonical.display())
+            ));
+        }
+    }
+
+    Ok(canonical)
+}
 
 /// 文件读取工具
 ///
@@ -94,18 +151,10 @@ impl hermes_tool_registry::Tool for ReadFileTool {
             .ok_or_else(|| ToolError::InvalidArgs("path must be string".into()))?;
 
         let path = PathBuf::from(path_str);
+        let workdir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
-        // Security: prevent path traversal by normalizing the path
-        let normalized = path
-            .components()
-            .fold(PathBuf::new(), |mut acc, c| {
-                match c {
-                    std::path::Component::Normal(p) => acc.push(p),
-                    std::path::Component::RootDir => acc.push("/"),
-                    _ => {} // skip .. and .
-                }
-                acc
-            });
+        // Security: validate path does not escape workdir or touch sensitive dirs
+        let normalized = validate_path_within_workdir(&path, &workdir)?;
 
         // Read file via Environment
         let content = self
@@ -202,18 +251,10 @@ impl hermes_tool_registry::Tool for WriteFileTool {
             .ok_or_else(|| ToolError::InvalidArgs("content must be string".into()))?;
 
         let path = PathBuf::from(path_str);
+        let workdir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
-        // Security: prevent path traversal by normalizing the path
-        let normalized = path
-            .components()
-            .fold(PathBuf::new(), |mut acc, c| {
-                match c {
-                    std::path::Component::Normal(p) => acc.push(p),
-                    std::path::Component::RootDir => acc.push("/"),
-                    _ => {} // skip .. and .
-                }
-                acc
-            });
+        // Security: validate path does not escape workdir or touch sensitive dirs
+        let normalized = validate_path_within_workdir(&path, &workdir)?;
 
         self.environment
             .write_file(&normalized, content)

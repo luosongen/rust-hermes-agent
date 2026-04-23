@@ -28,3 +28,5 @@ sha2 = "0.10"
 tracing.workspace = true
 chrono.workspace = true
 uuid.workspace = true
+once_cell.workspace = true
+url.workspace = true

@@ -22,6 +22,8 @@ pub mod code_execution;
 pub mod image_generation;
 pub mod transcription;
 pub mod text_to_speech;
+pub mod security_scanner;
+pub mod url_safety;
 pub mod homeassistant;
 pub mod mixture_of_agents;
 pub mod skills;
@@ -40,6 +42,8 @@ pub use code_execution::CodeExecutionTool;
 pub use image_generation::{ImageGenerationTool, ImageSize};
 pub use transcription::TranscriptionTool;
 pub use text_to_speech::TextToSpeechTool;
+pub use security_scanner::SecurityScannerTool;
+pub use url_safety::UrlSafetyTool;
 pub use homeassistant::HomeAssistantTool;
 pub use mixture_of_agents::MixtureOfAgentsTool;
 pub use skills::SkillsTool;
@@ -72,4 +76,6 @@ pub fn register_extended_tools(
     registry.register(SkillsTool::new());
     registry.register(TranscriptionTool::new());
     registry.register(TextToSpeechTool::new());
+    registry.register(SecurityScannerTool::new());
+    registry.register(UrlSafetyTool::new());
 }

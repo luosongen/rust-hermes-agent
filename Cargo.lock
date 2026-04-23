@@ -1157,6 +1157,7 @@ dependencies = [
  "hermes-memory",
  "hermes-tool-registry",
  "lazy_static",
+ "once_cell",
  "parking_lot",
  "regex",
  "reqwest",
@@ -1170,6 +1171,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
+ "url",
  "urlencoding",
  "uuid",
 ]
