@@ -174,3 +174,31 @@ impl Default for CredentialPool {
         Self::new()
     }
 }
+
+/// A wrapper type for sensitive values that serializes as a placeholder for display.
+#[derive(Debug, Clone)]
+pub struct Secret<T>(pub T);
+
+impl<T> serde::Serialize for Secret<T>
+where
+    T: serde::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str("<redacted>")
+    }
+}
+
+impl<'de, T> serde::Deserialize<'de> for Secret<T>
+where
+    T: serde::Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Secret(T::deserialize(deserializer)?))
+    }
+}
