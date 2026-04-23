@@ -1,10 +1,13 @@
 //! FTS5 query sanitization
 
 use regex::Regex;
-use once_cell::Lazy;
+use once_cell::sync::Lazy;
 
 static FTS_SPECIAL_CHARS: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"[+\-&|!(){}[\]^"~*?:\\/]"#.into()).unwrap()
+    // FTS5 special characters: + - & | ! ( ) { } [ ] * ? ~ ^ " : /
+    // Note: - is not stripped here because hyphenated words are quoted by hyphenated regex
+    // Note: " is not stripped here because it's used for phrase quoting
+    Regex::new(r#"[+\&|!(){}\[\]~*?:\\/]"#).unwrap()
 });
 
 /// Sanitize user query for FTS5
@@ -23,6 +26,10 @@ pub fn sanitize_fts_query(query: &str) -> String {
     result = dotted.replace_all(&result, "\"$1\"").to_string();
 
     result = FTS_SPECIAL_CHARS.replace_all(&result, " ").to_string();
+
+    // Collapse multiple spaces into one
+    let multiple_spaces = Regex::new(r" +").unwrap();
+    result = multiple_spaces.replace_all(&result, " ").to_string();
 
     result
 }

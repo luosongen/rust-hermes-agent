@@ -29,8 +29,10 @@ pub mod builtin;
 pub mod session;
 pub mod sqlite_store;
 pub mod memory_manager;
+pub mod search;
 
 pub use sqlite_store::SqliteSessionStore;
 pub use session::*;
 pub use memory_manager::{MemoryManager, MemoryProvider};
 pub use builtin::BuiltinMemoryProvider;
+pub use search::{sanitize_fts_query, SessionSummarizer};
