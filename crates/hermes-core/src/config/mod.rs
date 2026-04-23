@@ -693,3 +693,7 @@ mod tests {
         assert!(!config.display.compact);
     }
 }
+
+// Include tests from tests.rs file
+#[cfg(test)]
+mod config_tests;
