@@ -9,12 +9,14 @@ use serde::Deserialize;
 use serde_json::json;
 use std::path::PathBuf;
 
-const GROQ_URL: &str = "https://api.groq.com/v1/audio/transcriptions";
+const GROQ_URL: &str = "https://api.groq.com/openai/v1/audio/transcriptions";
+const OPENAI_WHISPER_URL: &str = "https://api.openai.com/v1/audio/transcriptions";
 
 #[derive(Clone)]
 pub struct TranscriptionTool {
     http_client: reqwest::Client,
     groq_api_key: Option<String>,
+    openai_api_key: Option<String>,
     whisper_model_path: Option<PathBuf>,
 }
 
@@ -29,12 +31,20 @@ impl TranscriptionTool {
         Self {
             http_client: reqwest::Client::new(),
             groq_api_key: std::env::var("GROQ_API_KEY").ok(),
+            openai_api_key: std::env::var("OPENAI_API_KEY")
+                .or_else(|_| std::env::var("HERMES_OPENAI_API_KEY"))
+                .ok(),
             whisper_model_path: None,
         }
     }
 
     pub fn with_groq_api_key(mut self, key: String) -> Self {
         self.groq_api_key = Some(key);
+        self
+    }
+
+    pub fn with_openai_api_key(mut self, key: String) -> Self {
+        self.openai_api_key = Some(key);
         self
     }
 
@@ -75,6 +85,50 @@ impl TranscriptionTool {
             .ok_or_else(|| ToolError::Execution("No text in faster-whisper output".to_string()))
     }
 
+    async fn transcribe_openai(&self, audio_path: &str, language: Option<&str>) -> Result<String, ToolError> {
+        let api_key = self.openai_api_key.as_ref()
+            .ok_or_else(|| ToolError::Execution("OPENAI_API_KEY not set".to_string()))?;
+
+        let audio_bytes = tokio::fs::read(audio_path).await
+            .map_err(|e| ToolError::Execution(format!("Audio file read error: {}", e)))?;
+
+        let file_name = PathBuf::from(audio_path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "audio.mp3".to_string());
+
+        let mut form = reqwest::multipart::Form::new()
+            .part("file", reqwest::multipart::Part::bytes(audio_bytes)
+                .file_name(file_name)
+                .mime_str("audio/mpeg")
+                .unwrap_or_else(|_| reqwest::multipart::Part::bytes(Vec::new())))
+            .text("model", "whisper-1");
+
+        if let Some(lang) = language {
+            form = form.text("language", lang.to_string());
+        }
+
+        let resp = self.http_client
+            .post(OPENAI_WHISPER_URL)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| ToolError::Execution(format!("OpenAI Whisper API error: {}", e)))?;
+
+        if !resp.status().is_success() {
+            let err_text = resp.text().await.unwrap_or_default();
+            return Err(ToolError::Execution(format!("OpenAI Whisper API error: {}", err_text)));
+        }
+
+        let body: serde_json::Value = resp.json().await
+            .map_err(|e| ToolError::Execution(format!("OpenAI response error: {}", e)))?;
+
+        body["text"].as_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| ToolError::Execution("No text in OpenAI response".to_string()))
+    }
+
     async fn transcribe_groq(&self, audio_path: &str, language: Option<&str>) -> Result<String, ToolError> {
         let api_key = self.groq_api_key.as_ref()
             .ok_or_else(|| ToolError::Execution("GROQ_API_KEY not set".to_string()))?;
@@ -82,15 +136,21 @@ impl TranscriptionTool {
         let audio_bytes = tokio::fs::read(audio_path).await
             .map_err(|e| ToolError::Execution(format!("Audio file read error: {}", e)))?;
 
-        let lang = language.unwrap_or("en").to_string();
+        let file_name = PathBuf::from(audio_path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "audio.mp3".to_string());
 
-        let form = reqwest::multipart::Form::new()
+        let mut form = reqwest::multipart::Form::new()
             .part("file", reqwest::multipart::Part::bytes(audio_bytes)
-                .file_name("audio.mp3")
+                .file_name(file_name)
                 .mime_str("audio/mpeg")
                 .unwrap_or_else(|_| reqwest::multipart::Part::bytes(Vec::new())))
-            .text("model", "whisper-large-v3")
-            .text("language", lang);
+            .text("model", "whisper-large-v3");
+
+        if let Some(lang) = language {
+            form = form.text("language", lang.to_string());
+        }
 
         let resp = self.http_client
             .post(GROQ_URL)
@@ -101,7 +161,8 @@ impl TranscriptionTool {
             .map_err(|e| ToolError::Execution(format!("Groq API error: {}", e)))?;
 
         if !resp.status().is_success() {
-            return Err(ToolError::Execution(format!("Groq API error: {}", resp.status())));
+            let err_text = resp.text().await.unwrap_or_default();
+            return Err(ToolError::Execution(format!("Groq API error: {}", err_text)));
         }
 
         let body: serde_json::Value = resp.json().await
@@ -128,7 +189,7 @@ impl Tool for TranscriptionTool {
     fn name(&self) -> &str { "transcribe" }
 
     fn description(&self) -> &str {
-        "Transcribe audio to text. Supports faster-whisper (local) and Groq Whisper API."
+        "Transcribe audio to text. Supports faster-whisper (local), OpenAI Whisper API, and Groq Whisper API."
     }
 
     fn parameters(&self) -> serde_json::Value {
@@ -138,10 +199,10 @@ impl Tool for TranscriptionTool {
                 "audio_path": { "type": "string", "description": "Path to audio file" },
                 "provider": {
                     "type": "string",
-                    "enum": ["faster-whisper", "groq"],
+                    "enum": ["faster-whisper", "openai", "groq"],
                     "default": "faster-whisper"
                 },
-                "language": { "type": "string", "description": "Language code (e.g., 'en')" }
+                "language": { "type": "string", "description": "Language code (e.g., 'en', 'zh')" }
             },
             "required": ["audio_path"]
         })
@@ -152,6 +213,12 @@ impl Tool for TranscriptionTool {
             .map_err(|e| ToolError::InvalidArgs(e.to_string()))?;
 
         let text = match params.provider.as_str() {
+            "openai" => {
+                if self.openai_api_key.is_none() {
+                    return Err(ToolError::Execution("OPENAI_API_KEY not configured".to_string()));
+                }
+                self.transcribe_openai(&params.audio_path, params.language.as_deref()).await?
+            }
             "groq" => {
                 if self.groq_api_key.is_none() {
                     return Err(ToolError::Execution("GROQ_API_KEY not configured".to_string()));

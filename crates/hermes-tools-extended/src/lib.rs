@@ -21,6 +21,7 @@ pub mod delegate_tool;
 pub mod code_execution;
 pub mod image_generation;
 pub mod transcription;
+pub mod text_to_speech;
 pub mod homeassistant;
 pub mod mixture_of_agents;
 pub mod skills;
@@ -37,6 +38,8 @@ pub use memory::MemoryTool;
 pub use delegate_tool::DelegateTool;
 pub use code_execution::CodeExecutionTool;
 pub use image_generation::{ImageGenerationTool, ImageSize};
+pub use transcription::TranscriptionTool;
+pub use text_to_speech::TextToSpeechTool;
 pub use homeassistant::HomeAssistantTool;
 pub use mixture_of_agents::MixtureOfAgentsTool;
 pub use skills::SkillsTool;
@@ -67,4 +70,6 @@ pub fn register_extended_tools(
     registry.register(HomeAssistantTool::new());
     registry.register(MixtureOfAgentsTool::new());
     registry.register(SkillsTool::new());
+    registry.register(TranscriptionTool::new());
+    registry.register(TextToSpeechTool::new());
 }
