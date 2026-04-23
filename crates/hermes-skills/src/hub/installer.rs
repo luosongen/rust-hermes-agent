@@ -11,7 +11,7 @@ pub struct Installer {
     index: SkillIndex,
     market: MarketClient,
     scanner: SecurityScanner,
-    skills_dir: PathBuf,
+    pub skills_dir: PathBuf,
 }
 
 impl Installer {

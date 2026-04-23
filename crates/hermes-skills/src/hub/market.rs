@@ -2,6 +2,7 @@ use reqwest::Client;
 use crate::hub::error::HubError;
 use crate::hub::types::{MarketCategoriesResponse, MarketCategory, MarketSkill};
 
+#[derive(Clone)]
 pub struct MarketClient {
     client: Client,
     base_url: String,

@@ -7,6 +7,7 @@ use parking_lot::Mutex;
 use crate::hub::error::HubError;
 use crate::hub::types::{Category, SkillIndexEntry, SkillSource};
 
+#[derive(Clone)]
 pub struct SkillIndex {
     pub conn: Arc<Mutex<Connection>>,
 }
