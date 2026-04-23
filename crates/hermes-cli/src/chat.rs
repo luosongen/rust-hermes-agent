@@ -27,6 +27,7 @@ use anyhow::Result;
 use hermes_core::{
     Agent, AgentConfig, ConversationRequest, LlmProvider, RetryingProvider,
 };
+use hermes_environment::{EnvironmentManager, LocalEnvironment};
 use hermes_memory::{NewSession, SessionStore, SqliteSessionStore};
 use hermes_provider::OpenAiProvider;
 use hermes_tool_registry::ToolRegistry;
@@ -56,12 +57,41 @@ pub async fn run_chat(
     // 创建 SQLite 会话存储，使用 Arc 共享
     let session_store = Arc::new(SqliteSessionStore::new("hermes.db".into()).await?);
 
+    // 创建执行环境（根据配置选择本地、Docker 或 SSH）
+    let environment = if let Ok(config) = hermes_core::config::Config::load() {
+        let env_config = hermes_environment::EnvironmentConfig {
+            env_type: config.environment.env_type.parse().unwrap_or(hermes_environment::EnvironmentType::Local),
+            working_directory: config.environment.working_directory.clone(),
+            docker: hermes_environment::DockerConfigSerde {
+                container: config.environment.docker.container.clone(),
+                docker_host: config.environment.docker.docker_host.clone(),
+                working_directory: config.environment.docker.working_directory.clone(),
+                auto_start: config.environment.docker.auto_start,
+                user: config.environment.docker.user.clone(),
+            },
+            ssh: hermes_environment::SSHConfigSerde {
+                host: config.environment.ssh.host.clone(),
+                port: config.environment.ssh.port,
+                user: config.environment.ssh.user.clone(),
+                private_key: config.environment.ssh.private_key.clone(),
+                password: config.environment.ssh.password.clone(),
+                working_directory: config.environment.ssh.working_directory.clone(),
+                ssh_options: config.environment.ssh.ssh_options.clone(),
+            },
+            env_vars: std::collections::HashMap::new(),
+        };
+        EnvironmentManager::from_config(&env_config)
+            .unwrap_or_else(|_| Arc::new(LocalEnvironment::new(".")))
+    } else {
+        Arc::new(LocalEnvironment::new("."))
+    };
+
     // 创建工具注册表
     let tool_registry = Arc::new(ToolRegistry::new());
 
-    // 如果未禁用工具，注册内置工具
+    // 如果未禁用工具，注册内置工具（注入 Environment）
     if !no_tools {
-        register_builtin_tools(&tool_registry);
+        register_builtin_tools(&tool_registry, environment.clone());
     }
 
     // 构建 LLM Provider

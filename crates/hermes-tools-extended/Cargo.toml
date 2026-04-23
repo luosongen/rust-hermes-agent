@@ -14,6 +14,7 @@ parking_lot.workspace = true
 hermes-core.workspace = true
 hermes-memory.workspace = true
 hermes-tool-registry.workspace = true
+hermes-environment.workspace = true
 scraper.workspace = true
 regex.workspace = true
 cron.workspace = true

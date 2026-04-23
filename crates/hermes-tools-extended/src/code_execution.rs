@@ -1,22 +1,25 @@
 //! CodeExecutionTool — PTC (Programmatic Tool Calling)
 //!
 //! 让 LLM 写 Python 脚本，通过 RPC 调用 hermes 工具。
+//! 支持通过 `Environment` 后端执行代码，实现远程代码执行。
 
 use async_trait::async_trait;
 use hermes_core::{ToolContext, ToolError};
+use hermes_environment::{Environment, EnvironmentError};
 use hermes_tool_registry::Tool;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::process::Stdio;
-use tokio::time::{timeout, Duration};
+use tokio::time::Duration;
 
 /// CodeExecutionTool — 单例
+#[derive(Clone)]
 pub struct CodeExecutionTool {
     store: Arc<RwLock<ExecutionStore>>,
     config: ExecutionConfig,
+    environment: Arc<dyn Environment>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,10 +68,11 @@ impl Default for ExecutionStore {
 }
 
 impl CodeExecutionTool {
-    pub fn new(config: ExecutionConfig) -> Self {
+    pub fn new(config: ExecutionConfig, environment: Arc<dyn Environment>) -> Self {
         Self {
             store: Arc::new(RwLock::new(ExecutionStore::default())),
             config,
+            environment,
         }
     }
 
@@ -189,40 +193,55 @@ impl Tool for CodeExecutionTool {
         std::fs::write(&code_path, code)
             .map_err(|e| ToolError::Execution(format!("Code write error: {}", e)))?;
 
-        // Spawn Python process
-        let mut cmd = tokio::process::Command::new("python3");
-        cmd.arg(&code_path)
-           .current_dir(tmpdir.path())
-           .stdout(Stdio::piped())
-           .stderr(Stdio::piped())
-           .env("PYTHONPATH", tmpdir.path().to_string_lossy().as_ref());
-
-        let output = timeout(Duration::from_secs(timeout_secs), cmd.output())
+        // 使用 Environment 执行 Python 进程
+        let result = self
+            .environment
+            .execute(
+                "python3",
+                &[code_path.to_string_lossy().as_ref()],
+                Some(tmpdir.path()),
+                Some(Duration::from_secs(timeout_secs)),
+                Some(&[("PYTHONPATH".to_string(), tmpdir.path().to_string_lossy().to_string())].into_iter().collect()),
+            )
             .await
-            .map_err(|_| ToolError::Execution("Code execution timed out".to_string()))?
-            .map_err(|e| ToolError::Execution(format!("Process error: {}", e)))?;
+            .map_err(env_err_to_tool_err)?;
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-
-        let truncated_stdout = if stdout.len() > self.config.max_stdout_bytes {
-            format!("{}...[truncated {} bytes]", &stdout[..self.config.max_stdout_bytes], stdout.len() - self.config.max_stdout_bytes)
+        let truncated_stdout = if result.stdout.len() > self.config.max_stdout_bytes {
+            format!("{}...[truncated {} bytes]", &result.stdout[..self.config.max_stdout_bytes], result.stdout.len() - self.config.max_stdout_bytes)
         } else {
-            stdout.to_string()
+            result.stdout
         };
 
-        let truncated_stderr = if stderr.len() > self.config.max_stderr_bytes {
-            format!("{}...[truncated {} bytes]", &stderr[..self.config.max_stderr_bytes], stderr.len() - self.config.max_stderr_bytes)
+        let truncated_stderr = if result.stderr.len() > self.config.max_stderr_bytes {
+            format!("{}...[truncated {} bytes]", &result.stderr[..self.config.max_stderr_bytes], result.stderr.len() - self.config.max_stderr_bytes)
         } else {
-            stderr.to_string()
+            result.stderr
         };
 
         Ok(json!({
-            "success": output.status.success(),
+            "success": result.success,
             "stdout": truncated_stdout,
             "stderr": truncated_stderr,
-            "exit_code": output.status.code(),
+            "exit_code": result.exit_code,
             "mode": mode
         }).to_string())
+    }
+}
+
+/// 将 EnvironmentError 转换为 ToolError
+fn env_err_to_tool_err(e: EnvironmentError) -> ToolError {
+    match e {
+        EnvironmentError::Execution(msg) => ToolError::Execution(msg),
+        EnvironmentError::CommandNotFound(cmd) => ToolError::Execution(format!("Command not found: {}", cmd)),
+        EnvironmentError::PermissionDenied(msg) => ToolError::PermissionDenied(msg),
+        EnvironmentError::PathNotFound(msg) => ToolError::NotFound(msg),
+        EnvironmentError::Connection(msg) => ToolError::Execution(format!("Connection failed: {}", msg)),
+        EnvironmentError::Authentication(msg) => ToolError::Execution(format!("Authentication failed: {}", msg)),
+        EnvironmentError::Timeout(msg) => ToolError::Timeout(msg),
+        EnvironmentError::InvalidConfig(msg) => ToolError::Execution(format!("Invalid config: {}", msg)),
+        EnvironmentError::Io(err) => ToolError::Execution(format!("IO error: {}", err)),
+        EnvironmentError::NotSupported { backend, operation } => {
+            ToolError::Execution(format!("{} not supported in {}", operation, backend))
+        }
     }
 }

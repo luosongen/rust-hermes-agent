@@ -64,21 +64,30 @@ pub use browser_tools::{
 };
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
+use hermes_environment::Environment;
 use hermes_tool_registry::ToolRegistry;
 
 /// 将所有内置工具注册到传入的 ToolRegistry
 ///
 /// 注册的工具包括：
-/// - `ReadFileTool` - 文件读取工具
-/// - `WriteFileTool` - 文件写入工具
-/// - `TerminalTool` - 终端执行工具
+/// - `ReadFileTool` - 文件读取工具（通过 Environment 后端）
+/// - `WriteFileTool` - 文件写入工具（通过 Environment 后端）
+/// - `TerminalTool` - 终端执行工具（通过 Environment 后端）
+/// - `TodoTool` - 任务列表管理工具
+/// - `ApprovalTool` - 危险命令审批工具
+/// - `Browser*Tool` - 浏览器自动化工具
+///
+/// # 参数
+/// - `registry` — 工具注册表
+/// - `environment` — 执行环境后端（本地、Docker、SSH 等）
 ///
 /// 注意：技能相关工具需要单独创建并注册（依赖 SkillRegistry）
-pub fn register_builtin_tools(registry: &ToolRegistry) {
-    registry.register(ReadFileTool::new());
-    registry.register(WriteFileTool::new());
-    registry.register(TerminalTool::new());
+pub fn register_builtin_tools(registry: &ToolRegistry, environment: Arc<dyn Environment>) {
+    registry.register(ReadFileTool::new(environment.clone()));
+    registry.register(WriteFileTool::new(environment.clone()));
+    registry.register(TerminalTool::new(environment.clone()));
     registry.register(TodoTool::new());
     let config_dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("~/.config/hermes-agent"));
     registry.register(ApprovalTool::new(config_dir.clone()));

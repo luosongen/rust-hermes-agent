@@ -1,9 +1,15 @@
+use std::sync::Arc;
+use hermes_environment::LocalEnvironment;
 use hermes_tool_registry::Tool;
 use hermes_tools_extended::code_execution::{CodeExecutionTool, ExecutionConfig};
 
+fn test_env() -> Arc<LocalEnvironment> {
+    Arc::new(LocalEnvironment::new("."))
+}
+
 #[test]
 fn test_code_execution_tool_name() {
-    let tool = CodeExecutionTool::new(ExecutionConfig::default());
+    let tool = CodeExecutionTool::new(ExecutionConfig::default(), test_env());
     assert_eq!(tool.name(), "execute_code");
 }
 
@@ -17,7 +23,7 @@ fn test_execution_config_defaults() {
 
 #[test]
 fn test_generate_stub_uds() {
-    let tool = CodeExecutionTool::new(ExecutionConfig::default());
+    let tool = CodeExecutionTool::new(ExecutionConfig::default(), test_env());
     let stub = tool.generate_stub("uds", Some("/tmp/test.sock"));
     assert!(stub.contains("socket.AF_UNIX"));
     assert!(stub.contains("/tmp/test.sock"));
@@ -25,7 +31,7 @@ fn test_generate_stub_uds() {
 
 #[test]
 fn test_generate_stub_file() {
-    let tool = CodeExecutionTool::new(ExecutionConfig::default());
+    let tool = CodeExecutionTool::new(ExecutionConfig::default(), test_env());
     let stub = tool.generate_stub("file", None);
     assert!(stub.contains("req_file"));
     assert!(stub.contains("resp_file"));

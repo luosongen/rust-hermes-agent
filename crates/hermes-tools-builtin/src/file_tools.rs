@@ -21,12 +21,15 @@
 
 use async_trait::async_trait;
 use hermes_core::{ToolContext, ToolError};
+use hermes_environment::{Environment, EnvironmentError};
 use serde_json::json;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// 文件读取工具
 ///
 /// 根据给定路径读取文件内容，支持行偏移和行数限制。
+/// 通过 `Environment` 后端读取文件，支持本地、Docker、SSH 等执行环境。
 ///
 /// # 工具参数
 /// - `path`（必填）：文件路径，支持绝对路径和相对路径
@@ -35,12 +38,15 @@ use std::path::PathBuf;
 ///
 /// # 返回格式
 /// JSON 包含 `success`、`path`、`content`、`size`
-pub struct ReadFileTool;
+#[derive(Clone)]
+pub struct ReadFileTool {
+    environment: Arc<dyn Environment>,
+}
 
 impl ReadFileTool {
     /// 创建新的 ReadFileTool 实例
-    pub fn new() -> Self {
-        Self
+    pub fn new(environment: Arc<dyn Environment>) -> Self {
+        Self { environment }
     }
 }
 
@@ -81,34 +87,52 @@ impl hermes_tool_registry::Tool for ReadFileTool {
     async fn execute(
         &self,
         args: serde_json::Value,
-        context: ToolContext,
+        _context: ToolContext,
     ) -> Result<String, ToolError> {
         let path_str = args["path"]
             .as_str()
             .ok_or_else(|| ToolError::InvalidArgs("path must be string".into()))?;
 
         let path = PathBuf::from(path_str);
-        let full_path = if path.is_absolute() {
-            path
-        } else {
-            context.working_directory.join(path)
-        };
 
-        // Security: prevent path traversal
-        let canonical = full_path
-            .canonicalize()
-            .map_err(|e| ToolError::NotFound(format!("Path not found: {}", e)))?;
+        // Security: prevent path traversal by normalizing the path
+        let normalized = path
+            .components()
+            .fold(PathBuf::new(), |mut acc, c| {
+                match c {
+                    std::path::Component::Normal(p) => acc.push(p),
+                    std::path::Component::RootDir => acc.push("/"),
+                    _ => {} // skip .. and .
+                }
+                acc
+            });
 
-        // Read file
-        let content = tokio::fs::read_to_string(&canonical)
+        // Read file via Environment
+        let content = self
+            .environment
+            .read_file(&normalized)
             .await
-            .map_err(|e| ToolError::Execution(format!("Failed to read: {}", e)))?;
+            .map_err(env_err_to_tool_err)?;
+
+        // Apply offset and limit
+        let offset = args["offset"].as_i64().unwrap_or(0).max(0) as usize;
+        let limit = args["limit"].as_i64().unwrap_or(1000).max(1) as usize;
+
+        let lines: Vec<&str> = content.lines().collect();
+        let total_lines = lines.len();
+        let start = offset.min(total_lines);
+        let end = (start + limit).min(total_lines);
+        let selected: Vec<&str> = lines[start..end].to_vec();
+        let result = selected.join("\n");
 
         Ok(json!({
             "success": true,
-            "path": canonical.to_string_lossy(),
-            "content": content,
-            "size": content.len()
+            "path": path_str,
+            "content": result,
+            "size": result.len(),
+            "total_lines": total_lines,
+            "offset": start,
+            "lines_read": end - start
         }).to_string())
     }
 }
@@ -116,6 +140,7 @@ impl hermes_tool_registry::Tool for ReadFileTool {
 /// 文件写入工具
 ///
 /// 将内容写入指定路径的文件，支持创建新文件和覆盖已有文件。
+/// 通过 `Environment` 后端写入文件，支持本地、Docker、SSH 等执行环境。
 ///
 /// # 工具参数
 /// - `path`（必填）：文件路径，支持绝对路径和相对路径
@@ -123,16 +148,15 @@ impl hermes_tool_registry::Tool for ReadFileTool {
 ///
 /// # 返回格式
 /// JSON 包含 `success`、`path`、`bytes_written`
-///
-/// # 安全说明
-/// - 不支持目录创建，依赖父目录已存在
-/// - 相对路径基于 `context.working_directory` 解析
-pub struct WriteFileTool;
+#[derive(Clone)]
+pub struct WriteFileTool {
+    environment: Arc<dyn Environment>,
+}
 
 impl WriteFileTool {
     /// 创建新的 WriteFileTool 实例
-    pub fn new() -> Self {
-        Self
+    pub fn new(environment: Arc<dyn Environment>) -> Self {
+        Self { environment }
     }
 }
 
@@ -167,7 +191,7 @@ impl hermes_tool_registry::Tool for WriteFileTool {
     async fn execute(
         &self,
         args: serde_json::Value,
-        context: ToolContext,
+        _context: ToolContext,
     ) -> Result<String, ToolError> {
         let path_str = args["path"]
             .as_str()
@@ -178,20 +202,46 @@ impl hermes_tool_registry::Tool for WriteFileTool {
             .ok_or_else(|| ToolError::InvalidArgs("content must be string".into()))?;
 
         let path = PathBuf::from(path_str);
-        let full_path = if path.is_absolute() {
-            path
-        } else {
-            context.working_directory.join(path)
-        };
 
-        tokio::fs::write(&full_path, content)
+        // Security: prevent path traversal by normalizing the path
+        let normalized = path
+            .components()
+            .fold(PathBuf::new(), |mut acc, c| {
+                match c {
+                    std::path::Component::Normal(p) => acc.push(p),
+                    std::path::Component::RootDir => acc.push("/"),
+                    _ => {} // skip .. and .
+                }
+                acc
+            });
+
+        self.environment
+            .write_file(&normalized, content)
             .await
-            .map_err(|e| ToolError::Execution(format!("Failed to write: {}", e)))?;
+            .map_err(env_err_to_tool_err)?;
 
         Ok(json!({
             "success": true,
-            "path": full_path.to_string_lossy(),
+            "path": path_str,
             "bytes_written": content.len()
         }).to_string())
+    }
+}
+
+/// 将 EnvironmentError 转换为 ToolError
+fn env_err_to_tool_err(e: EnvironmentError) -> ToolError {
+    match e {
+        EnvironmentError::Execution(msg) => ToolError::Execution(msg),
+        EnvironmentError::CommandNotFound(cmd) => ToolError::Execution(format!("Command not found: {}", cmd)),
+        EnvironmentError::PermissionDenied(msg) => ToolError::PermissionDenied(msg),
+        EnvironmentError::PathNotFound(msg) => ToolError::NotFound(msg),
+        EnvironmentError::Connection(msg) => ToolError::Execution(format!("Connection failed: {}", msg)),
+        EnvironmentError::Authentication(msg) => ToolError::Execution(format!("Authentication failed: {}", msg)),
+        EnvironmentError::Timeout(msg) => ToolError::Timeout(msg),
+        EnvironmentError::InvalidConfig(msg) => ToolError::Execution(format!("Invalid config: {}", msg)),
+        EnvironmentError::Io(err) => ToolError::Execution(format!("IO error: {}", err)),
+        EnvironmentError::NotSupported { backend, operation } => {
+            ToolError::Execution(format!("{} not supported in {}", operation, backend))
+        }
     }
 }

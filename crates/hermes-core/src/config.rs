@@ -52,6 +52,60 @@ use std::path::PathBuf;
 use parking_lot::Mutex;
 use std::sync::OnceLock;
 
+/// 环境配置（用于序列化/反序列化）
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct EnvironmentConfig {
+    /// 环境类型: local, docker, ssh
+    #[serde(default = "default_env_type")]
+    pub env_type: String,
+    /// 通用工作目录
+    #[serde(default = "default_working_dir")]
+    pub working_directory: PathBuf,
+    /// Docker 专用配置
+    #[serde(default)]
+    pub docker: DockerEnvConfig,
+    /// SSH 专用配置
+    #[serde(default)]
+    pub ssh: SSHEnvConfig,
+}
+
+fn default_env_type() -> String {
+    "local".to_string()
+}
+
+fn default_working_dir() -> PathBuf {
+    PathBuf::from(".")
+}
+
+/// Docker 环境配置
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DockerEnvConfig {
+    pub container: Option<String>,
+    pub docker_host: Option<String>,
+    pub working_directory: Option<PathBuf>,
+    #[serde(default)]
+    pub auto_start: bool,
+    pub user: Option<String>,
+}
+
+/// SSH 环境配置
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SSHEnvConfig {
+    pub host: Option<String>,
+    #[serde(default = "default_ssh_port")]
+    pub port: u16,
+    pub user: Option<String>,
+    pub private_key: Option<PathBuf>,
+    pub password: Option<String>,
+    pub working_directory: Option<PathBuf>,
+    #[serde(default)]
+    pub ssh_options: Vec<String>,
+}
+
+fn default_ssh_port() -> u16 {
+    22
+}
+
 /// 配置缓存（使用 OnceLock 实现懒加载）
 static CONFIG_CACHE: OnceLock<Mutex<Config>> = OnceLock::new();
 
@@ -119,6 +173,8 @@ pub struct Config {
     pub nudge: NudgeConfig,
     #[serde(default)]
     pub tools: HashMap<String, ToolConfig>,
+    #[serde(default)]
+    pub environment: EnvironmentConfig,
 }
 
 impl Default for DefaultsConfig {
@@ -148,6 +204,7 @@ impl Default for Config {
             gateway: GatewayConfig::default(),
             nudge: NudgeConfig::default(),
             tools: HashMap::new(),
+            environment: EnvironmentConfig::default(),
         }
     }
 }
@@ -206,6 +263,19 @@ impl Config {
         if other.nudge != NudgeConfig::default() {
             self.nudge = other.nudge;
         }
+        // Environment config merge
+        if other.environment.env_type != default_env_type() {
+            self.environment.env_type = other.environment.env_type;
+        }
+        if other.environment.working_directory != default_working_dir() {
+            self.environment.working_directory = other.environment.working_directory.clone();
+        }
+        if other.environment.docker.container.is_some() {
+            self.environment.docker = other.environment.docker.clone();
+        }
+        if other.environment.ssh.host.is_some() {
+            self.environment.ssh = other.environment.ssh.clone();
+        }
     }
 
     /// 从 HERMES_* 环境变量加载配置
@@ -252,6 +322,33 @@ impl Config {
                 self.nudge.skill_interval = interval;
             }
         }
+        // Environment configuration
+        if let Ok(val) = std::env::var("HERMES_ENVIRONMENT_TYPE") {
+            self.environment.env_type = val;
+        }
+        if let Ok(val) = std::env::var("HERMES_ENVIRONMENT_WORKDIR") {
+            self.environment.working_directory = PathBuf::from(val);
+        }
+        if let Ok(val) = std::env::var("HERMES_DOCKER_CONTAINER") {
+            self.environment.docker.container = Some(val);
+        }
+        if let Ok(val) = std::env::var("HERMES_DOCKER_HOST") {
+            self.environment.docker.docker_host = Some(val);
+        }
+        if let Ok(val) = std::env::var("HERMES_SSH_HOST") {
+            self.environment.ssh.host = Some(val);
+        }
+        if let Ok(val) = std::env::var("HERMES_SSH_USER") {
+            self.environment.ssh.user = Some(val);
+        }
+        if let Ok(val) = std::env::var("HERMES_SSH_PORT") {
+            if let Ok(port) = val.parse() {
+                self.environment.ssh.port = port;
+            }
+        }
+        if let Ok(val) = std::env::var("HERMES_SSH_PRIVATE_KEY") {
+            self.environment.ssh.private_key = Some(PathBuf::from(val));
+        }
     }
 
     /// 通过键获取配置值（支持点号分隔的嵌套键）
@@ -280,6 +377,12 @@ impl Config {
                 })
             }
             ["tools", name, "enabled"] => self.tools.get(name as &str).map(|t| t.enabled.to_string()),
+            ["environment", "type"] => Some(self.environment.env_type.clone()),
+            ["environment", "working_directory"] => Some(self.environment.working_directory.display().to_string()),
+            ["environment", "docker", "container"] => self.environment.docker.container.clone(),
+            ["environment", "ssh", "host"] => self.environment.ssh.host.clone(),
+            ["environment", "ssh", "user"] => self.environment.ssh.user.clone(),
+            ["environment", "ssh", "port"] => Some(self.environment.ssh.port.to_string()),
             _ => {
                 if let Some(val) = self.nudge.get(key) {
                     return Some(val);
@@ -316,6 +419,30 @@ impl Config {
             ["tools", name, "enabled"] => {
                 let enabled = value.parse().unwrap_or(true);
                 self.tools.insert(name.to_string(), ToolConfig::new(enabled));
+                true
+            }
+            ["environment", "type"] => {
+                self.environment.env_type = value;
+                true
+            }
+            ["environment", "working_directory"] => {
+                self.environment.working_directory = PathBuf::from(value);
+                true
+            }
+            ["environment", "docker", "container"] => {
+                self.environment.docker.container = Some(value);
+                true
+            }
+            ["environment", "ssh", "host"] => {
+                self.environment.ssh.host = Some(value);
+                true
+            }
+            ["environment", "ssh", "user"] => {
+                self.environment.ssh.user = Some(value);
+                true
+            }
+            ["environment", "ssh", "port"] => {
+                self.environment.ssh.port = value.parse().unwrap_or(22);
                 true
             }
             _ => false,

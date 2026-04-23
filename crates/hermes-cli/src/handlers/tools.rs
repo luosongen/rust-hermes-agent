@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use hermes_core::config::Config;
+use hermes_environment::LocalEnvironment;
 use hermes_tool_registry::ToolRegistry;
 use hermes_tools_builtin::register_builtin_tools;
 use std::sync::Arc;
@@ -11,7 +12,8 @@ use std::sync::Arc;
 /// List all registered tools
 pub fn list_tools() -> Result<()> {
     let registry = Arc::new(ToolRegistry::new());
-    register_builtin_tools(&registry);
+    let environment = Arc::new(LocalEnvironment::new("."));
+    register_builtin_tools(&registry, environment);
 
     let tools = registry.tool_names();
     println!("Available tools:\n");
