@@ -43,6 +43,43 @@
 //! - 网关配置被 `gateway.rs` 使用来初始化 HTTP 服务器
 //! - 凭证被 `credentials.rs` 的 `CredentialPool` 使用
 
+// ============================================================================
+// Submodule declarations
+// ============================================================================
+
+pub mod provider_core;
+pub mod provider_custom;
+pub mod provider;
+pub mod backend;
+pub mod compression;
+pub mod auxiliary;
+pub mod mcp;
+pub mod stt;
+pub mod delegation;
+pub mod display;
+pub mod personality;
+
+// ============================================================================
+// Re-exports for convenience
+// ============================================================================
+
+pub use provider_core::CoreProvider;
+pub use provider_custom::CustomProviderConfig;
+pub use provider::{ProviderSettings, SmartRouterConfig, ProviderModelConfig};
+pub use backend::{BackendConfig, BackendSettings, LocalBackend, DockerBackend, SSHBackend,
+                  SingularityBackend, ModalBackend, DaytonaBackend};
+pub use compression::CompressionConfig;
+pub use auxiliary::AuxiliaryConfig;
+pub use mcp::{McpServersConfig, McpServerConfig, McpTransport};
+pub use stt::{SttConfig, SttProviderConfig};
+pub use delegation::DelegationConfig;
+pub use display::DisplayConfig;
+pub use personality::{PersonalityConfig, PersonalityPreset};
+
+// ============================================================================
+// Imports
+// ============================================================================
+
 use serde::{Deserialize, Serialize};
 use crate::nudge::NudgeConfig;
 use std::collections::HashMap;
@@ -51,6 +88,10 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use parking_lot::Mutex;
 use std::sync::OnceLock;
+
+// ============================================================================
+// Environment Configuration
+// ============================================================================
 
 /// 环境配置（用于序列化/反序列化）
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -106,6 +147,10 @@ fn default_ssh_port() -> u16 {
     22
 }
 
+// ============================================================================
+// Config Cache
+// ============================================================================
+
 /// 配置缓存（使用 OnceLock 实现懒加载）
 static CONFIG_CACHE: OnceLock<Mutex<Config>> = OnceLock::new();
 
@@ -121,6 +166,10 @@ pub fn config_dir() -> PathBuf {
 pub fn config_file() -> PathBuf {
     config_dir().join("config.toml")
 }
+
+// ============================================================================
+// Platform Configuration
+// ============================================================================
 
 /// 消息平台的配置结构
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -160,6 +209,10 @@ impl ToolConfig {
     }
 }
 
+// ============================================================================
+// Main Config Structure
+// ============================================================================
+
 /// 主要配置结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -175,7 +228,31 @@ pub struct Config {
     pub tools: HashMap<String, ToolConfig>,
     #[serde(default)]
     pub environment: EnvironmentConfig,
+
+    // New config fields with serde(default) for backward compatibility
+    #[serde(default)]
+    pub providers: ProviderSettings,
+    #[serde(default)]
+    pub backends: BackendSettings,
+    #[serde(default)]
+    pub compression: CompressionConfig,
+    #[serde(default)]
+    pub auxiliary: AuxiliaryConfig,
+    #[serde(default)]
+    pub mcp_servers: McpServersConfig,
+    #[serde(default)]
+    pub stt: SttConfig,
+    #[serde(default)]
+    pub delegation: DelegationConfig,
+    #[serde(default)]
+    pub display: DisplayConfig,
+    #[serde(default)]
+    pub personality: PersonalityConfig,
 }
+
+// ============================================================================
+// Default Implementations
+// ============================================================================
 
 impl Default for DefaultsConfig {
     fn default() -> Self {
@@ -205,9 +282,23 @@ impl Default for Config {
             nudge: NudgeConfig::default(),
             tools: HashMap::new(),
             environment: EnvironmentConfig::default(),
+            // New config fields with defaults
+            providers: ProviderSettings::default(),
+            backends: BackendSettings::default(),
+            compression: CompressionConfig::default(),
+            auxiliary: AuxiliaryConfig::default(),
+            mcp_servers: McpServersConfig::default(),
+            stt: SttConfig::default(),
+            delegation: DelegationConfig::default(),
+            display: DisplayConfig::default(),
+            personality: PersonalityConfig::default(),
         }
     }
 }
+
+// ============================================================================
+// Config Methods
+// ============================================================================
 
 impl Config {
     /// 从所有来源加载配置
@@ -558,6 +649,10 @@ pub enum ConfigError {
     Io(#[from] std::io::Error),
 }
 
+// ============================================================================
+// Tests
+// ============================================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -585,5 +680,16 @@ mod tests {
         let display = config.display();
         assert!(display.contains("sk-ab...****"));
         assert!(!display.contains("sk-abcdef123456"));
+    }
+
+    #[test]
+    fn test_config_new_fields_have_defaults() {
+        let config = Config::default();
+        // Verify new fields have defaults
+        assert!(!config.providers.smart_router.enabled);
+        assert_eq!(config.providers.default, "openai/gpt-4o");
+        assert!(!config.compression.enabled);
+        assert!(!config.delegation.enabled);
+        assert!(!config.display.compact);
     }
 }

@@ -1,19 +1,61 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-mod backend_local;
-mod backend_docker;
-mod backend_ssh;
-mod backend_singularity;
-mod backend_modal;
-mod backend_daytona;
+// ============================================================================
+// Backend type definitions
+// ============================================================================
 
-pub use backend_local::LocalBackend;
-pub use backend_docker::DockerBackend;
-pub use backend_ssh::SSHBackend;
-pub use backend_singularity::SingularityBackend;
-pub use backend_modal::ModalBackend;
-pub use backend_daytona::DaytonaBackend;
+/// Local backend configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LocalBackend {
+    #[serde(default)]
+    pub enabled: bool,
+}
+
+/// Docker backend configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DockerBackend {
+    #[serde(default)]
+    pub enabled: bool,
+    pub image: Option<String>,
+    pub container: Option<String>,
+}
+
+/// SSH backend configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SSHBackend {
+    #[serde(default)]
+    pub enabled: bool,
+    pub host: Option<String>,
+    pub port: Option<u16>,
+    pub user: Option<String>,
+}
+
+/// Singularity backend configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SingularityBackend {
+    #[serde(default)]
+    pub enabled: bool,
+    pub image: Option<String>,
+}
+
+/// Modal backend configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ModalBackend {
+    #[serde(default)]
+    pub enabled: bool,
+}
+
+/// Daytona backend configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DaytonaBackend {
+    #[serde(default)]
+    pub enabled: bool,
+}
+
+// ============================================================================
+// Backend configuration enum
+// ============================================================================
 
 /// Backend configuration enum
 #[derive(Debug, Clone, Serialize, Deserialize)]
