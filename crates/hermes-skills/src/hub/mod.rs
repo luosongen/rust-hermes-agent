@@ -1,3 +1,4 @@
+pub mod browse;
 pub mod error;
 pub mod index;
 pub mod installer;
@@ -6,6 +7,7 @@ pub mod security;
 pub mod sync;
 pub mod types;
 
+pub use browse::Browse;
 pub use error::HubError;
 pub use index::SkillIndex;
 pub use installer::Installer;
