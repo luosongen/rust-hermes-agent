@@ -56,9 +56,13 @@ pub mod delegate;
 pub mod nudge;
 pub mod compression;
 pub mod routing;
+pub mod prompt_caching;
+pub mod error_classifier;
 
 pub use compression::{ToolResultPruner, Summarizer, PRUNED_TOOL_PLACEHOLDER};
 pub use routing::{SmartRouter, ComplexityDetector, RouteResolution};
+pub use prompt_caching::{AnthropicCache, CacheDispatcher, CacheResult, CacheStrategy, CacheTTL, OpenAiCache};
+pub use error_classifier::{classify_api_error, classify_http_error, ClassifiedError, FailoverReason};
 
 pub use credentials::CredentialPool;
 pub use context_compressor::ContextCompressor;
