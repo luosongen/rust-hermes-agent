@@ -9,6 +9,8 @@ pub mod resolver;
 
 use hermes_core::{ChatRequest, ChatResponse, ProviderError};
 
+pub use client_cache::ClientCache;
+
 /// Auxiliary 客户端配置
 #[derive(Debug, Clone)]
 pub struct AuxiliaryConfig {
