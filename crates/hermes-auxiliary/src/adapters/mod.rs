@@ -1,5 +1,11 @@
 //! Client adapter trait — 统一的 LLM 客户端接口
 
+pub mod openai;
+pub mod anthropic;
+
+pub use openai::OpenAiAdapter;
+pub use anthropic::AnthropicAdapter;
+
 use async_trait::async_trait;
 use hermes_core::{ChatRequest, ChatResponse, ModelId, ProviderError};
 
