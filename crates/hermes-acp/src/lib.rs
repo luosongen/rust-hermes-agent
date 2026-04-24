@@ -118,6 +118,9 @@ impl AcpServer {
                 Arc::new(hermes_memory::SqliteSessionStore::new("hermes.db".into()).await.unwrap()),
                 self.agent_config.clone(),
                 hermes_core::NudgeConfig::default(),
+                None,
+                None,
+                None,
             )),
             // 创建会话存储
             session_store: Arc::new(hermes_memory::SqliteSessionStore::new("hermes.db".into()).await.unwrap()),
