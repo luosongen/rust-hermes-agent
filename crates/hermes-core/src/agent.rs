@@ -23,8 +23,9 @@
 //! - 定义了 `AgentError` 相关的错误转换
 
 use crate::{
-    AgentError, ChatRequest, ConversationRequest, ConversationResponse, LlmProvider, ModelId,
-    NudgeConfig, NudgeService, NudgeState, NudgeTrigger, Role, ToolContext, ToolDispatcher,
+    AgentError, ChatRequest, ConversationRequest, ConversationResponse, DisplayHandler,
+    LlmProvider, ModelId, NudgeConfig, NudgeService, NudgeState, NudgeTrigger, Role,
+    TitleGenerator, ToolContext, ToolDispatcher, TrajectorySaver,
 };
 use hermes_memory::{NewMessage, SessionStore};
 use parking_lot::Mutex;
@@ -62,6 +63,12 @@ pub struct Agent {
     // Nudge system
     nudge_service: Arc<NudgeService>,
     nudge_state: Arc<Mutex<NudgeState>>,
+    // Display handler
+    display_handler: Option<Arc<dyn DisplayHandler>>,
+    // Title generator
+    title_generator: Option<Arc<TitleGenerator>>,
+    // Trajectory saver
+    trajectory_saver: Option<TrajectorySaver>,
 }
 
 impl Agent {
@@ -86,6 +93,9 @@ impl Agent {
         session_store: Arc<dyn SessionStore>,
         config: AgentConfig,
         nudge_config: NudgeConfig,
+        display_handler: Option<Arc<dyn DisplayHandler>>,
+        title_generator: Option<Arc<TitleGenerator>>,
+        trajectory_saver: Option<TrajectorySaver>,
     ) -> Self {
         Self {
             provider,
@@ -94,6 +104,9 @@ impl Agent {
             config,
             nudge_service: Arc::new(NudgeService::new(nudge_config)),
             nudge_state: Arc::new(Mutex::new(NudgeState::default())),
+            display_handler,
+            title_generator,
+            trajectory_saver,
         }
     }
 
@@ -103,6 +116,9 @@ impl Agent {
         tools: Arc<dyn ToolDispatcher>,
         session_store: Arc<dyn SessionStore>,
         config: AgentConfig,
+        display_handler: Option<Arc<dyn DisplayHandler>>,
+        title_generator: Option<Arc<TitleGenerator>>,
+        trajectory_saver: Option<TrajectorySaver>,
     ) -> Self {
         Self::new(
             provider,
@@ -110,6 +126,9 @@ impl Agent {
             session_store,
             config,
             NudgeConfig::disabled(),
+            display_handler,
+            title_generator,
+            trajectory_saver,
         )
     }
 
@@ -143,10 +162,12 @@ impl Agent {
         messages.push(crate::Message::user(request.content.clone()));
 
         let mut iterations = 0;
+        let mut final_result: Result<ConversationResponse, AgentError> = Err(AgentError::IterationExhausted);
 
         loop {
             if iterations >= self.config.max_iterations {
-                return Err(AgentError::IterationExhausted);
+                final_result = Err(AgentError::IterationExhausted);
+                break;
             }
 
             let model_id = ModelId::parse(&self.config.model)
@@ -172,6 +193,13 @@ impl Agent {
                 crate::FinishReason::Stop => {
                     if let Some(tool_calls) = response.tool_calls {
                         for call in &tool_calls {
+                            // Display: tool started
+                            if let Some(display) = &self.display_handler {
+                                let args_value = serde_json::to_value(&call.arguments).unwrap_or_default();
+                                display.tool_started(&call.name, &args_value);
+                                display.flush();
+                            }
+
                             let context = ToolContext {
                                 session_id: request.session_id.clone().unwrap_or_default(),
                                 working_directory: self.config.working_directory.clone(),
@@ -183,6 +211,13 @@ impl Agent {
                                 .dispatch(call, context)
                                 .await
                                 .map_err(AgentError::Tool)?;
+
+                            // Display: tool completed
+                            if let Some(display) = &self.display_handler {
+                                display.tool_completed(&call.name, &result);
+                                display.flush();
+                            }
+
                             messages.push(crate::Message::tool_result(
                                 call.id.clone(),
                                 crate::Content::Text(result),
@@ -254,13 +289,36 @@ impl Agent {
                                 },
                             )
                             .await;
+
+                        // ========== Title Generation ==========
+                        // Only generate title on first exchange (user + assistant = 2 messages)
+                        if messages.len() == 2 {
+                            if let Some(generator) = &self.title_generator {
+                                if let Some(session_id) = &request.session_id {
+                                    let generator = generator.clone();
+                                    let user_msg = request.content.clone();
+                                    let assistant_msg = response.content.clone();
+                                    let store = self.session_store.clone();
+                                    let sid = session_id.clone();
+                                    tokio::spawn(async move {
+                                        if let Some(title) = generator.generate(&user_msg, &assistant_msg).await {
+                                            if let Ok(Some(mut session)) = store.get_session(&sid).await {
+                                                session.title = Some(title);
+                                                let _ = store.update_session(&session).await;
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        }
                     }
 
-                    return Ok(ConversationResponse {
+                    final_result = Ok(ConversationResponse {
                         content: response.content,
                         session_id: request.session_id,
                         usage: response.usage,
                     });
+                    break;
                 }
                 crate::FinishReason::Length => {
                     // 尝试使用上下文压缩
@@ -276,20 +334,31 @@ impl Agent {
                             continue;
                         }
                         Err(e) => {
-                            return Err(AgentError::Internal(format!(
+                            final_result = Err(AgentError::Internal(format!(
                                 "Context length exceeded and compression failed: {}",
                                 e
                             )));
+                            break;
                         }
                     }
                 }
                 crate::FinishReason::ContentFilter => {
-                    return Err(AgentError::ContentFiltered);
+                    final_result = Err(AgentError::ContentFiltered);
+                    break;
                 }
                 crate::FinishReason::Other => {
-                    return Err(AgentError::UnknownFinishReason);
+                    final_result = Err(AgentError::UnknownFinishReason);
+                    break;
                 }
             }
         }
+
+        // Save trajectory regardless of success/failure
+        if let Some(saver) = &self.trajectory_saver {
+            let completed = final_result.is_ok();
+            let _ = saver.save(&messages, &self.config.model, completed);
+        }
+
+        final_result
     }
 }
