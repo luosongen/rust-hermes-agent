@@ -75,6 +75,33 @@ impl DisplayHandler for CliDisplay {
     fn flush(&self) {
         let _ = std::io::stderr().flush();
     }
+
+    fn show_usage(&self, insights: &hermes_core::SessionInsights) {
+        let input_k = insights.input_tokens as f64 / 1000.0;
+        let output_k = insights.output_tokens as f64 / 1000.0;
+        let cost = insights.estimated_cost_usd;
+
+        // Count tool calls by name
+        let mut tool_counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+        for call in &insights.tool_calls {
+            *tool_counts.entry(call.tool_name.as_str()).or_insert(0) += 1;
+        }
+
+        let tools_str = if tool_counts.is_empty() {
+            String::new()
+        } else {
+            let parts: Vec<String> = tool_counts
+                .iter()
+                .map(|(name, count)| format!("{}({})", name, count))
+                .collect();
+            format!(" | {}", parts.join(", "))
+        };
+
+        eprint!(
+            "\r\x1b[K[Tokens: {:.1}K/{:.1}K | Cost: ${:.4}{}]",
+            input_k, output_k, cost, tools_str
+        );
+    }
 }
 
 impl Default for CliDisplay {
