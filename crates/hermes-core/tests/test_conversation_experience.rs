@@ -1,6 +1,6 @@
 //! Integration tests for conversation experience features
 
-use hermes_core::{DisplayHandler, NoopDisplay, TrajectorySaver};
+use hermes_core::{DisplayHandler, NoopDisplay, SessionInsights, TrajectorySaver};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -26,6 +26,7 @@ impl DisplayHandler for MockDisplay {
     fn tool_completed(&self, _tool_name: &str, _result: &str) {}
     fn tool_failed(&self, _tool_name: &str, _error: &str) {}
     fn thinking_chunk(&self, _chunk: &str) {}
+    fn show_usage(&self, _insights: &SessionInsights) {}
     fn show_diff(&self, _filename: &str, _old: &str, _new: &str) {}
     fn spinner_start(&self, _message: &str) {}
     fn spinner_stop(&self) {}
