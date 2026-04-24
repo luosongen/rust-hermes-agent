@@ -27,6 +27,9 @@ use crate::{
     LlmProvider, ModelId, NudgeConfig, NudgeService, NudgeState, NudgeTrigger, Role,
     TitleGenerator, ToolContext, ToolDispatcher, TrajectorySaver,
 };
+use crate::insights::{InsightsTracker, ToolCallRecord};
+use crate::rate_limit_tracker::RateLimitTracker;
+use crate::usage_pricing::{CostCalculator, PricingDatabase};
 use hermes_memory::{NewMessage, SessionStore};
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -69,6 +72,10 @@ pub struct Agent {
     title_generator: Option<Arc<TitleGenerator>>,
     // Trajectory saver
     trajectory_saver: Option<TrajectorySaver>,
+    // Insights tracker
+    insights_tracker: Option<Arc<dyn InsightsTracker>>,
+    // Rate limit tracker
+    rate_limit_tracker: Option<Arc<RateLimitTracker>>,
 }
 
 impl Agent {
@@ -96,6 +103,8 @@ impl Agent {
         display_handler: Option<Arc<dyn DisplayHandler>>,
         title_generator: Option<Arc<TitleGenerator>>,
         trajectory_saver: Option<TrajectorySaver>,
+        insights_tracker: Option<Arc<dyn InsightsTracker>>,
+        rate_limit_tracker: Option<Arc<RateLimitTracker>>,
     ) -> Self {
         Self {
             provider,
@@ -107,6 +116,8 @@ impl Agent {
             display_handler,
             title_generator,
             trajectory_saver,
+            insights_tracker,
+            rate_limit_tracker,
         }
     }
 
@@ -119,6 +130,8 @@ impl Agent {
         display_handler: Option<Arc<dyn DisplayHandler>>,
         title_generator: Option<Arc<TitleGenerator>>,
         trajectory_saver: Option<TrajectorySaver>,
+        insights_tracker: Option<Arc<dyn InsightsTracker>>,
+        rate_limit_tracker: Option<Arc<RateLimitTracker>>,
     ) -> Self {
         Self::new(
             provider,
@@ -129,6 +142,8 @@ impl Agent {
             display_handler,
             title_generator,
             trajectory_saver,
+            insights_tracker,
+            rate_limit_tracker,
         )
     }
 
@@ -216,6 +231,18 @@ impl Agent {
                             if let Some(display) = &self.display_handler {
                                 display.tool_completed(&call.name, &result);
                                 display.flush();
+                            }
+
+                            // Track tool call via insights tracker
+                            if let Some(tracker) = &self.insights_tracker {
+                                let record = ToolCallRecord {
+                                    tool_name: call.name.clone(),
+                                    started_at: 0.0, // timestamp not tracked before call
+                                    duration_ms: 0,   // duration not tracked
+                                    success: true,
+                                    error: None,
+                                };
+                                tracker.record_tool_call(record);
                             }
 
                             messages.push(crate::Message::tool_result(
@@ -309,6 +336,25 @@ impl Agent {
                                         }
                                     });
                                 }
+                            }
+                        }
+                    }
+
+                    // ========== Insights: Record usage and show ==========
+                    if let Some(tracker) = &self.insights_tracker {
+                        if let Some(usage) = &response.usage {
+                            let pricing_db = PricingDatabase::new();
+                            let calculator = CostCalculator::new(&pricing_db);
+                            let (provider, model) = self.config.model.split_once('/').unwrap_or(("unknown", "unknown"));
+                            let cost = calculator
+                                .calculate(provider, model, usage)
+                                .unwrap_or(0.0);
+                            tracker.record_usage(usage, cost);
+
+                            // Show usage via display handler
+                            if let Some(display) = &self.display_handler {
+                                display.show_usage(&tracker.get_insights());
+                                display.flush();
                             }
                         }
                     }
