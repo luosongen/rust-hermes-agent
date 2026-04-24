@@ -61,6 +61,7 @@ pub mod error_classifier;
 pub mod display;
 pub mod title_generator;
 pub mod trajectory;
+pub mod usage_pricing;
 
 pub use compression::{ToolResultPruner, Summarizer, PRUNED_TOOL_PLACEHOLDER};
 pub use routing::{SmartRouter, ComplexityDetector, RouteResolution};
