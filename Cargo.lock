@@ -969,6 +969,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "hermes-auxiliary"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "hermes-core",
+ "hermes-provider",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "hermes-cli"
 version = "0.1.0"
 dependencies = [
