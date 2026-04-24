@@ -58,6 +58,7 @@ pub mod compression;
 pub mod routing;
 pub mod prompt_caching;
 pub mod error_classifier;
+pub mod trajectory;
 
 pub use compression::{ToolResultPruner, Summarizer, PRUNED_TOOL_PLACEHOLDER};
 pub use routing::{SmartRouter, ComplexityDetector, RouteResolution};
