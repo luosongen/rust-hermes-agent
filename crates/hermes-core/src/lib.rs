@@ -59,9 +59,11 @@ pub mod routing;
 pub mod prompt_caching;
 pub mod error_classifier;
 pub mod display;
+pub mod insights;
 pub mod title_generator;
 pub mod trajectory;
 pub mod usage_pricing;
+pub mod rate_limit_tracker;
 
 pub use compression::{ToolResultPruner, Summarizer, PRUNED_TOOL_PLACEHOLDER};
 pub use routing::{SmartRouter, ComplexityDetector, RouteResolution};
@@ -70,6 +72,9 @@ pub use error_classifier::{classify_api_error, classify_http_error, ClassifiedEr
 pub use display::{DisplayHandler, NoopDisplay};
 pub use title_generator::TitleGenerator;
 pub use trajectory::TrajectorySaver;
+pub use insights::{InsightsTracker, InMemoryInsightsTracker, SessionInsights, ToolCallRecord};
+pub use usage_pricing::{PricingDatabase, PricingTier, CostCalculator};
+pub use rate_limit_tracker::RateLimitTracker;
 
 pub use credentials::CredentialPool;
 pub use context_compressor::ContextCompressor;
