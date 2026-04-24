@@ -26,6 +26,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 mod commands;
 mod handlers;
 mod chat;
+mod display;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

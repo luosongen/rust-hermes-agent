@@ -20,5 +20,6 @@
 pub mod chat;
 pub mod commands;
 pub mod handlers;
+pub mod display;
 
 pub use commands::*;

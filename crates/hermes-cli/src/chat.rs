@@ -25,8 +25,10 @@
 
 use anyhow::Result;
 use hermes_core::{
-    Agent, AgentConfig, ConversationRequest, LlmProvider, RetryingProvider,
+    Agent, AgentConfig, ConversationRequest, DisplayHandler, LlmProvider, RetryingProvider,
+    TitleGenerator, TrajectorySaver,
 };
+use crate::display::CliDisplay;
 use hermes_environment::{EnvironmentManager, LocalEnvironment};
 use hermes_memory::{NewSession, SessionStore, SqliteSessionStore};
 use hermes_provider::OpenAiProvider;
@@ -127,12 +129,25 @@ pub async fn run_chat(
         ..Default::default()
     };
     let nudge_config = hermes_core::config::Config::load().map(|c| c.nudge).unwrap_or_default();
+
+    // 创建显示处理器
+    let display_handler: Option<Arc<dyn DisplayHandler>> = Some(Arc::new(CliDisplay::new()));
+
+    // 创建标题生成器（复用同一个 provider）
+    let title_generator = Some(Arc::new(TitleGenerator::with_default_model(provider.clone())));
+
+    // 创建轨迹保存器
+    let trajectory_saver = Some(TrajectorySaver::default());
+
     let agent = Arc::new(Agent::new(
         provider,
         tool_registry,
         session_store.clone(),
         agent_config,
         nudge_config,
+        display_handler,
+        title_generator,
+        trajectory_saver,
     ));
 
     // 确定会话 ID

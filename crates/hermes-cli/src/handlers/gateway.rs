@@ -50,6 +50,10 @@ pub async fn start_gateway(port: u16) -> Result<()> {
     use std::path::PathBuf;
     use hermes_core::{LlmProvider, ToolDispatcher};
     use hermes_core::nudge::NudgeConfig;
+    use hermes_core::DisplayHandler;
+    use hermes_core::TitleGenerator;
+    use hermes_core::TrajectorySaver;
+    use crate::display::CliDisplay;
 
     // Initialize components
     let db_path = PathBuf::from("./hermes.db");
@@ -64,12 +68,21 @@ pub async fn start_gateway(port: u16) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("OpenAI API key not configured. Set HERMES_OPENAI_API_KEY or configure in config."))?;
 
     let provider: Arc<dyn LlmProvider> = Arc::new(OpenAiProvider::new(api_key, None));
+
+    // Gateway uses CliDisplay for HTTP webhook handling
+    let display_handler: Option<Arc<dyn DisplayHandler>> = Some(Arc::new(CliDisplay::new()));
+    let title_generator: Option<Arc<TitleGenerator>> = Some(Arc::new(TitleGenerator::with_default_model(provider.clone())));
+    let trajectory_saver: Option<TrajectorySaver> = Some(TrajectorySaver::default());
+
     let agent = Arc::new(Agent::new(
         provider,
         tool_registry,
         session_store,
         hermes_core::AgentConfig::default(),
         NudgeConfig::default(),
+        display_handler,
+        title_generator,
+        trajectory_saver,
     ));
 
     let gateway = Arc::new(Gateway::new(agent));
