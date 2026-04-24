@@ -142,7 +142,7 @@ pub async fn run_chat(
 
     // 创建追踪器
     let insights_tracker: Option<Arc<dyn InsightsTracker>> =
-        Some(Arc::new(InMemoryInsightsTracker::new("openai", &model)));
+        Some(Arc::new(InMemoryInsightsTracker::new("session", "openai", &model)));
     let rate_limit_tracker: Option<Arc<RateLimitTracker>> =
         Some(Arc::new(RateLimitTracker::new()));
 
@@ -157,15 +157,6 @@ pub async fn run_chat(
         trajectory_saver,
         insights_tracker,
         rate_limit_tracker,
-    ));
-        provider,
-        tool_registry,
-        session_store.clone(),
-        agent_config,
-        nudge_config,
-        display_handler,
-        title_generator,
-        trajectory_saver,
     ));
 
     // 确定会话 ID

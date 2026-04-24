@@ -64,12 +64,12 @@ impl InMemoryInsightsTracker {
 
 impl InsightsTracker for InMemoryInsightsTracker {
     fn record_tool_call(&self, record: ToolCallRecord) {
-        let mut insights = self.insights.lock();
+        let mut insights = self.insights.lock().unwrap();
         insights.tool_calls.push(record);
     }
 
     fn record_usage(&self, usage: &Usage, cost_usd: f64) {
-        let mut insights = self.insights.lock();
+        let mut insights = self.insights.lock().unwrap();
         insights.input_tokens = usage.input_tokens;
         insights.output_tokens = usage.output_tokens;
         insights.cache_read_tokens = usage.cache_read_tokens.unwrap_or(0);
@@ -79,6 +79,6 @@ impl InsightsTracker for InMemoryInsightsTracker {
     }
 
     fn get_insights(&self) -> SessionInsights {
-        self.insights.lock().clone()
+        self.insights.lock().unwrap().clone()
     }
 }

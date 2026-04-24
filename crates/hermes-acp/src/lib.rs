@@ -121,6 +121,8 @@ impl AcpServer {
                 None,
                 None,
                 None,
+                None,
+                None,
             )),
             // 创建会话存储
             session_store: Arc::new(hermes_memory::SqliteSessionStore::new("hermes.db".into()).await.unwrap()),
