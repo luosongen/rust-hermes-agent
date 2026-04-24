@@ -58,6 +58,8 @@ pub mod compression;
 pub mod routing;
 pub mod prompt_caching;
 pub mod error_classifier;
+pub mod credential_pool;
+pub mod retry_utils;
 pub mod display;
 pub mod insights;
 pub mod title_generator;
@@ -77,6 +79,8 @@ pub use usage_pricing::{PricingDatabase, PricingTier, CostCalculator};
 pub use rate_limit_tracker::RateLimitTracker;
 
 pub use credentials::CredentialPool;
+pub use credential_pool::{CredentialPool as CredPool, CredentialEntry, CredentialStatus, PoolStrategy};
+pub use retry_utils::{RetryConfig, jittered_backoff, with_retry};
 pub use context_compressor::ContextCompressor;
 pub use retrying_provider::RetryingProvider;
 pub use retry::RetryPolicy;

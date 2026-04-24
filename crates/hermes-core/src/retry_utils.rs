@@ -2,7 +2,7 @@
 //!
 //! 防止并发重试的惊群效应。
 
-use crate::{AgentError, ErrorClassifier};
+use crate::{AgentError, classify_api_error};
 use std::time::Duration;
 
 /// 重试配置
@@ -45,7 +45,10 @@ pub fn jittered_backoff(attempt: u32, config: &RetryConfig) -> Duration {
 pub async fn with_retry<F, Fut, T>(
     operation: F,
     config: &RetryConfig,
-    classifier: &ErrorClassifier,
+    provider: Option<&str>,
+    model: Option<&str>,
+    approx_tokens: usize,
+    context_length: usize,
 ) -> Result<T, AgentError>
 where
     F: Fn() -> Fut,
@@ -57,7 +60,20 @@ where
         match operation().await {
             Ok(result) => return Ok(result),
             Err(error) => {
-                let classified = classifier.classify(&error);
+                let classified = match &error {
+                    AgentError::Provider(e) => classify_api_error(e, provider, model, approx_tokens, context_length),
+                    _ => crate::ClassifiedError {
+                        reason: crate::FailoverReason::Unknown,
+                        status_code: None,
+                        provider: None,
+                        model: None,
+                        message: error.to_string(),
+                        retryable: false,
+                        should_compress: false,
+                        should_rotate_credential: false,
+                        should_fallback: false,
+                    },
+                };
 
                 if !classified.retryable || attempt >= config.max_attempts {
                     return Err(error);

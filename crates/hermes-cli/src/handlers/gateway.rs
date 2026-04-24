@@ -53,6 +53,7 @@ pub async fn start_gateway(port: u16) -> Result<()> {
     use hermes_core::DisplayHandler;
     use hermes_core::TitleGenerator;
     use hermes_core::TrajectorySaver;
+    use hermes_core::RetryConfig;
     use crate::display::CliDisplay;
 
     // Initialize components
@@ -73,6 +74,7 @@ pub async fn start_gateway(port: u16) -> Result<()> {
     let display_handler: Option<Arc<dyn DisplayHandler>> = Some(Arc::new(CliDisplay::new()));
     let title_generator: Option<Arc<TitleGenerator>> = Some(Arc::new(TitleGenerator::with_default_model(provider.clone())));
     let trajectory_saver: Option<TrajectorySaver> = Some(TrajectorySaver::default());
+    let retry_config = RetryConfig::default();
 
     let agent = Arc::new(Agent::new(
         provider,
@@ -85,6 +87,7 @@ pub async fn start_gateway(port: u16) -> Result<()> {
         trajectory_saver,
         None,
         None,
+        retry_config,
     ));
 
     let gateway = Arc::new(Gateway::new(agent));

@@ -25,10 +25,11 @@
 use crate::{
     AgentError, ChatRequest, ConversationRequest, ConversationResponse, DisplayHandler,
     LlmProvider, ModelId, NudgeConfig, NudgeService, NudgeState, NudgeTrigger, Role,
-    TitleGenerator, ToolContext, ToolDispatcher, TrajectorySaver,
+    TitleGenerator, ToolContext, ToolDispatcher, TrajectorySaver, RetryConfig,
 };
 use crate::insights::{InsightsTracker, ToolCallRecord};
 use crate::rate_limit_tracker::RateLimitTracker;
+use crate::retry_utils::with_retry;
 use crate::usage_pricing::{CostCalculator, PricingDatabase};
 use hermes_memory::{NewMessage, SessionStore};
 use parking_lot::Mutex;
@@ -76,6 +77,8 @@ pub struct Agent {
     insights_tracker: Option<Arc<dyn InsightsTracker>>,
     // Rate limit tracker
     rate_limit_tracker: Option<Arc<RateLimitTracker>>,
+    // Retry config
+    retry_config: RetryConfig,
 }
 
 impl Agent {
@@ -105,6 +108,7 @@ impl Agent {
         trajectory_saver: Option<TrajectorySaver>,
         insights_tracker: Option<Arc<dyn InsightsTracker>>,
         rate_limit_tracker: Option<Arc<RateLimitTracker>>,
+        retry_config: RetryConfig,
     ) -> Self {
         Self {
             provider,
@@ -118,6 +122,7 @@ impl Agent {
             trajectory_saver,
             insights_tracker,
             rate_limit_tracker,
+            retry_config,
         }
     }
 
@@ -132,6 +137,7 @@ impl Agent {
         trajectory_saver: Option<TrajectorySaver>,
         insights_tracker: Option<Arc<dyn InsightsTracker>>,
         rate_limit_tracker: Option<Arc<RateLimitTracker>>,
+        retry_config: RetryConfig,
     ) -> Self {
         Self::new(
             provider,
@@ -144,6 +150,7 @@ impl Agent {
             trajectory_saver,
             insights_tracker,
             rate_limit_tracker,
+            retry_config,
         )
     }
 

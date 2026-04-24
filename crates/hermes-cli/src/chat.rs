@@ -26,7 +26,7 @@
 use anyhow::Result;
 use hermes_core::{
     Agent, AgentConfig, ConversationRequest, DisplayHandler, InMemoryInsightsTracker,
-    InsightsTracker, LlmProvider, RateLimitTracker, RetryingProvider, TitleGenerator,
+    InsightsTracker, LlmProvider, RateLimitTracker, RetryingProvider, RetryConfig, TitleGenerator,
     TrajectorySaver,
 };
 use crate::display::CliDisplay;
@@ -146,6 +146,8 @@ pub async fn run_chat(
     let rate_limit_tracker: Option<Arc<RateLimitTracker>> =
         Some(Arc::new(RateLimitTracker::new()));
 
+    let retry_config = RetryConfig::default();
+
     let agent = Arc::new(Agent::new(
         provider,
         tool_registry,
@@ -157,6 +159,7 @@ pub async fn run_chat(
         trajectory_saver,
         insights_tracker,
         rate_limit_tracker,
+        retry_config,
     ));
 
     // 确定会话 ID
