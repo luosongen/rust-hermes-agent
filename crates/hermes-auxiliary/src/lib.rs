@@ -34,10 +34,49 @@ impl Default for AuxiliaryConfig {
 }
 
 /// 调用 LLM — 统一入口
+///
+/// 自动解析 provider、处理故障转移。
 pub async fn call_llm(
-    _request: ChatRequest,
-    _config: &AuxiliaryConfig,
+    request: ChatRequest,
+    config: &AuxiliaryConfig,
 ) -> Result<ChatResponse, ProviderError> {
-    // Placeholder — will be wired in later tasks
-    Err(ProviderError::Api("not yet implemented".into()))
+    let resolver = ProviderResolver::new();
+
+    let model_id = request.model.clone();
+    let provider_name = model_id.provider.clone();
+
+    // Step 1: Resolve provider
+    let (client, resolved_provider) = resolver
+        .resolve(Some(&provider_name), Some(&model_id.model), config)
+        .await
+        .map_err(|e| {
+            tracing::error!("failed to resolve provider '{}': {}", provider_name, e);
+            e
+        })?;
+
+    // Step 2: Make the call
+    match client.chat(request.clone()).await {
+        Ok(response) => Ok(response),
+        Err(error) => {
+            // Step 3: Check if we should fallback
+            if fallback::should_fallback(&error, Some(&resolved_provider)) {
+                tracing::warn!(
+                    "provider '{}' returned fallback-eligible error: {}",
+                    resolved_provider, error
+                );
+                // Try next provider in chain
+                match resolver
+                    .resolve(None, Some(&model_id.model), config)
+                    .await
+                {
+                    Ok((fallback_client, _fallback_name)) => {
+                        fallback_client.chat(request).await
+                    }
+                    Err(_) => Err(error),
+                }
+            } else {
+                Err(error)
+            }
+        }
+    }
 }
