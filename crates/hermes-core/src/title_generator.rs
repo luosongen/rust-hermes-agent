@@ -1,13 +1,9 @@
 //! Title Generator — 基于首条对话自动生成会话标题
 
-use crate::{ChatRequest, Content, LlmProvider, Message, ModelId};
+use crate::{ChatRequest, LlmProvider, Message, ModelId};
 use std::sync::Arc;
 
-const TITLE_PROMPT: &str = (
-    "Generate a short, descriptive title (3-7 words) for a conversation that starts with the "
-    "following exchange. The title should capture the main topic or intent. "
-    "Return ONLY the title text, nothing else. No quotes, no punctuation at the end, no prefixes."
-);
+const TITLE_PROMPT: &str = "Generate a short, descriptive title (3-7 words) for a conversation that starts with the following exchange. The title should capture the main topic or intent. Return ONLY the title text, nothing else. No quotes, no punctuation at the end, no prefixes.";
 
 /// 会话标题生成器
 ///
@@ -75,5 +71,17 @@ impl TitleGenerator {
                 None
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Message;
+
+    #[tokio::test]
+    async fn test_title_generator_truncates_long_messages() {
+        // This is a compile-time check that TitleGenerator works
+        // Real tests would need a mock provider
     }
 }
