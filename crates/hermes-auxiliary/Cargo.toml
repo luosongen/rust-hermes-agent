@@ -1,0 +1,14 @@
+[package]
+name = "hermes-auxiliary"
+version.workspace = true
+edition.workspace = true
+description = "Auxiliary LLM client with multi-provider resolution and fallback"
+
+[dependencies]
+hermes-core.workspace = true
+hermes-provider.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
