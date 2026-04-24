@@ -25,8 +25,9 @@
 
 use anyhow::Result;
 use hermes_core::{
-    Agent, AgentConfig, ConversationRequest, DisplayHandler, LlmProvider, RetryingProvider,
-    TitleGenerator, TrajectorySaver,
+    Agent, AgentConfig, ConversationRequest, DisplayHandler, InMemoryInsightsTracker,
+    InsightsTracker, LlmProvider, RateLimitTracker, RetryingProvider, TitleGenerator,
+    TrajectorySaver,
 };
 use crate::display::CliDisplay;
 use hermes_environment::{EnvironmentManager, LocalEnvironment};
@@ -139,7 +140,24 @@ pub async fn run_chat(
     // 创建轨迹保存器
     let trajectory_saver = Some(TrajectorySaver::default());
 
+    // 创建追踪器
+    let insights_tracker: Option<Arc<dyn InsightsTracker>> =
+        Some(Arc::new(InMemoryInsightsTracker::new("openai", &model)));
+    let rate_limit_tracker: Option<Arc<RateLimitTracker>> =
+        Some(Arc::new(RateLimitTracker::new()));
+
     let agent = Arc::new(Agent::new(
+        provider,
+        tool_registry,
+        session_store.clone(),
+        agent_config,
+        nudge_config,
+        display_handler,
+        title_generator,
+        trajectory_saver,
+        insights_tracker,
+        rate_limit_tracker,
+    ));
         provider,
         tool_registry,
         session_store.clone(),

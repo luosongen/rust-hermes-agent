@@ -83,6 +83,8 @@ pub async fn start_gateway(port: u16) -> Result<()> {
         display_handler,
         title_generator,
         trajectory_saver,
+        None,
+        None,
     ));
 
     let gateway = Arc::new(Gateway::new(agent));
