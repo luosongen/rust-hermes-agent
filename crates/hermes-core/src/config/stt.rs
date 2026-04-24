@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::credentials::Secret;
+use serde::{Deserialize, Serialize};
 
 /// STT provider configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,9 +15,15 @@ pub struct SttProviderConfig {
     pub enabled: bool,
 }
 
-fn default_stt_provider() -> String { "local".to_string() }
-fn default_stt_model() -> String { "whisper-large-v3".to_string() }
-fn default_stt_enabled() -> bool { true }
+fn default_stt_provider() -> String {
+    "local".to_string()
+}
+fn default_stt_model() -> String {
+    "whisper-large-v3".to_string()
+}
+fn default_stt_enabled() -> bool {
+    true
+}
 
 /// STT (Speech-to-Text) configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,7 +34,9 @@ pub struct SttConfig {
     pub providers: Vec<SttProviderConfig>,
 }
 
-fn default_stt_default() -> String { "local".to_string() }
+fn default_stt_default() -> String {
+    "local".to_string()
+}
 
 impl Default for SttConfig {
     fn default() -> Self {

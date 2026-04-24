@@ -119,10 +119,7 @@ impl Agent {
         request: ConversationRequest,
     ) -> Result<ConversationResponse, AgentError> {
         let messages = if let Some(session_id) = &request.session_id {
-            let msgs = self
-                .session_store
-                .get_messages(session_id, 1000, 0)
-                .await?;
+            let msgs = self.session_store.get_messages(session_id, 1000, 0).await?;
             msgs.into_iter()
                 .map(|m| crate::Message {
                     role: match m.role.as_str() {
@@ -176,10 +173,7 @@ impl Agent {
                     if let Some(tool_calls) = response.tool_calls {
                         for call in &tool_calls {
                             let context = ToolContext {
-                                session_id: request
-                                    .session_id
-                                    .clone()
-                                    .unwrap_or_default(),
+                                session_id: request.session_id.clone().unwrap_or_default(),
                                 working_directory: self.config.working_directory.clone(),
                                 user_id: None,
                                 task_id: Some(call.id.clone()),
@@ -206,7 +200,7 @@ impl Agent {
                         self.nudge_service.check_triggers(
                             &mut nudge_state,
                             messages.len(),
-                            0,  // no tool calls this turn
+                            0, // no tool calls this turn
                         )
                     };
 
@@ -226,7 +220,7 @@ impl Agent {
                             let chat_request = ChatRequest {
                                 model: model_id,
                                 messages: messages_for_review,
-                                tools: None,  // Review agent has no tools
+                                tools: None, // Review agent has no tools
                                 system_prompt: Some(prompt.to_string()),
                                 temperature: None,
                                 max_tokens: None,
@@ -254,10 +248,7 @@ impl Agent {
                                     tool_calls: None,
                                     tool_name: None,
                                     timestamp: now,
-                                    token_count: response
-                                        .usage
-                                        .as_ref()
-                                        .map(|u| u.output_tokens),
+                                    token_count: response.usage.as_ref().map(|u| u.output_tokens),
                                     finish_reason: Some("stop".to_string()),
                                     reasoning: response.reasoning.clone(),
                                 },
@@ -278,16 +269,17 @@ impl Agent {
                         self.config.model.clone(),
                         self.provider.context_length(&model_id).unwrap_or(4096),
                     );
-                    
+
                     match compressor.compress(messages.clone(), None, None).await {
                         Ok(compressed_messages) => {
                             messages = compressed_messages;
                             continue;
                         }
                         Err(e) => {
-                            return Err(AgentError::Internal(
-                                format!("Context length exceeded and compression failed: {}", e),
-                            ));
+                            return Err(AgentError::Internal(format!(
+                                "Context length exceeded and compression failed: {}",
+                                e
+                            )));
                         }
                     }
                 }

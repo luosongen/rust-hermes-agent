@@ -117,8 +117,8 @@ impl NudgeService {
         let memory_triggered = self.config.memory_interval > 0
             && state.turns_since_memory >= self.config.memory_interval;
 
-        let skill_triggered = self.config.skill_interval > 0
-            && state.iters_since_skill >= self.config.skill_interval;
+        let skill_triggered =
+            self.config.skill_interval > 0 && state.iters_since_skill >= self.config.skill_interval;
 
         if memory_triggered {
             state.turns_since_memory = 0;
@@ -273,8 +273,17 @@ mod tests {
         let config = NudgeConfig::default();
         let service = NudgeService::new(config);
 
-        assert_eq!(service.get_prompt(NudgeTrigger::Memory), ReviewPrompts::MEMORY_REVIEW);
-        assert_eq!(service.get_prompt(NudgeTrigger::Skill), ReviewPrompts::SKILL_REVIEW);
-        assert_eq!(service.get_prompt(NudgeTrigger::Both), ReviewPrompts::COMBINED_REVIEW);
+        assert_eq!(
+            service.get_prompt(NudgeTrigger::Memory),
+            ReviewPrompts::MEMORY_REVIEW
+        );
+        assert_eq!(
+            service.get_prompt(NudgeTrigger::Skill),
+            ReviewPrompts::SKILL_REVIEW
+        );
+        assert_eq!(
+            service.get_prompt(NudgeTrigger::Both),
+            ReviewPrompts::COMBINED_REVIEW
+        );
     }
 }

@@ -17,19 +17,19 @@ pub struct PersonalityConfig {
     pub personalities: Vec<PersonalityPreset>,
 }
 
-fn default_personality() -> String { "helpfulness".to_string() }
+fn default_personality() -> String {
+    "helpfulness".to_string()
+}
 
 impl Default for PersonalityConfig {
     fn default() -> Self {
         Self {
             default: "helpfulness".to_string(),
-            personalities: vec![
-                PersonalityPreset {
-                    name: "helpfulness".to_string(),
-                    system_prompt: "You are a helpful assistant.".to_string(),
-                    model: None,
-                },
-            ],
+            personalities: vec![PersonalityPreset {
+                name: "helpfulness".to_string(),
+                system_prompt: "You are a helpful assistant.".to_string(),
+                model: None,
+            }],
         }
     }
 }

@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::credentials::Secret;
+use serde::{Deserialize, Serialize};
 
 /// Custom provider for user-defined providers
 #[derive(Debug, Clone, Serialize, Deserialize)]

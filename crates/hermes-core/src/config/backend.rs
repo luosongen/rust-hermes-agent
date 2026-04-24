@@ -99,4 +99,6 @@ impl Default for BackendSettings {
     }
 }
 
-fn default_backend() -> BackendConfig { BackendConfig::default() }
+fn default_backend() -> BackendConfig {
+    BackendConfig::default()
+}

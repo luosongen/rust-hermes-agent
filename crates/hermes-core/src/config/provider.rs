@@ -15,9 +15,15 @@ pub struct ProviderModelConfig {
     pub supports_function_calls: bool,
 }
 
-fn default_enabled() -> bool { true }
-fn default_cache_priority() -> i32 { 0 }
-fn default_supports_function_calls() -> bool { false }
+fn default_enabled() -> bool {
+    true
+}
+fn default_cache_priority() -> i32 {
+    0
+}
+fn default_supports_function_calls() -> bool {
+    false
+}
 
 /// Smart router configuration for automatic model selection
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,9 +38,15 @@ pub struct SmartRouterConfig {
     pub default_model: String,
 }
 
-fn default_router_enabled() -> bool { false }
-fn default_cheap_threshold() -> f32 { 0.3 }
-fn default_cheap_max_tokens() -> u32 { 4096 }
+fn default_router_enabled() -> bool {
+    false
+}
+fn default_cheap_threshold() -> f32 {
+    0.3
+}
+fn default_cheap_max_tokens() -> u32 {
+    4096
+}
 
 /// Provider settings with routing configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

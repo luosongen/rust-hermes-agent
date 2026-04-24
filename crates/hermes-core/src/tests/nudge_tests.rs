@@ -19,7 +19,10 @@ fn test_memory_nudge_triggers_at_interval() {
     assert_eq!(state.turns_since_memory, 2);
 
     // Turn 3 - should trigger memory
-    assert_eq!(service.check_triggers(&mut state, 1, 0), NudgeTrigger::Memory);
+    assert_eq!(
+        service.check_triggers(&mut state, 1, 0),
+        NudgeTrigger::Memory
+    );
     assert_eq!(state.turns_since_memory, 0); // reset after trigger
 }
 
@@ -37,7 +40,10 @@ fn test_skill_nudge_triggers_at_interval() {
     assert_eq!(state.iters_since_skill, 2);
 
     // 1 more tool call (total 3) - should trigger skill
-    assert_eq!(service.check_triggers(&mut state, 1, 1), NudgeTrigger::Skill);
+    assert_eq!(
+        service.check_triggers(&mut state, 1, 1),
+        NudgeTrigger::Skill
+    );
     assert_eq!(state.iters_since_skill, 0); // reset after trigger
 }
 
@@ -117,7 +123,16 @@ fn test_get_prompt_returns_correct_prompts() {
 
     let service = NudgeService::new(NudgeConfig::default());
 
-    assert_eq!(service.get_prompt(NudgeTrigger::Memory), ReviewPrompts::MEMORY_REVIEW);
-    assert_eq!(service.get_prompt(NudgeTrigger::Skill), crate::nudge::ReviewPrompts::SKILL_REVIEW);
-    assert_eq!(service.get_prompt(NudgeTrigger::Both), crate::nudge::ReviewPrompts::COMBINED_REVIEW);
+    assert_eq!(
+        service.get_prompt(NudgeTrigger::Memory),
+        ReviewPrompts::MEMORY_REVIEW
+    );
+    assert_eq!(
+        service.get_prompt(NudgeTrigger::Skill),
+        crate::nudge::ReviewPrompts::SKILL_REVIEW
+    );
+    assert_eq!(
+        service.get_prompt(NudgeTrigger::Both),
+        crate::nudge::ReviewPrompts::COMBINED_REVIEW
+    );
 }

@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::credentials::Secret;
+use serde::{Deserialize, Serialize};
 
 /// Core provider enum for known providers
 #[derive(Debug, Clone, Serialize, Deserialize)]

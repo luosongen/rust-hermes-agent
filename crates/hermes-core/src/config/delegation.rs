@@ -14,8 +14,12 @@ pub struct DelegationConfig {
     pub terminate_on_model: Vec<String>,
 }
 
-fn default_delegation_enabled() -> bool { false }
-fn default_max_depth() -> u32 { 3 }
+fn default_delegation_enabled() -> bool {
+    false
+}
+fn default_max_depth() -> u32 {
+    3
+}
 
 impl Default for DelegationConfig {
     fn default() -> Self {

@@ -76,7 +76,9 @@ impl CredentialPool {
         let name = name.into();
         let mut inner = self.inner.write();
         inner.credentials.insert(name.clone(), key);
-        inner.health.insert(name.clone(), CredentialHealth::new(name.clone()));
+        inner
+            .health
+            .insert(name.clone(), CredentialHealth::new(name.clone()));
         if !inner.order.contains(&name) {
             inner.order.push(name);
         }

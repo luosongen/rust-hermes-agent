@@ -4,12 +4,13 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{CoreProvider, BackendConfig, DockerBackend, LocalBackend, SSHBackend,
-                         CompressionConfig, AuxiliaryConfig, DelegationConfig, DisplayConfig,
-                         PersonalityConfig, PersonalityPreset, McpServerConfig, McpTransport,
-                         McpServersConfig, SttConfig, SttProviderConfig, Config,
-                         ProviderSettings, BackendSettings};
-    use crate::config::provider_core::{OpenRouterConfig, OpenAIConfig, AnthropicConfig};
+    use crate::config::provider_core::{AnthropicConfig, OpenAIConfig, OpenRouterConfig};
+    use crate::config::{
+        AuxiliaryConfig, BackendConfig, BackendSettings, CompressionConfig, Config, CoreProvider,
+        DelegationConfig, DisplayConfig, DockerBackend, LocalBackend, McpServerConfig,
+        McpServersConfig, McpTransport, PersonalityConfig, PersonalityPreset, ProviderSettings,
+        SSHBackend, SttConfig, SttProviderConfig,
+    };
     use crate::credentials::Secret;
 
     // Provider tests
@@ -207,16 +208,14 @@ mod tests {
     fn test_stt_config_serialization() {
         let config = SttConfig {
             default: "openai".to_string(),
-            providers: vec![
-                SttProviderConfig {
-                    name: "openai".to_string(),
-                    provider: "openai".to_string(),
-                    model: "whisper-1".to_string(),
-                    api_key: None,
-                    base_url: None,
-                    enabled: true,
-                },
-            ],
+            providers: vec![SttProviderConfig {
+                name: "openai".to_string(),
+                provider: "openai".to_string(),
+                model: "whisper-1".to_string(),
+                api_key: None,
+                base_url: None,
+                enabled: true,
+            }],
         };
 
         let serialized = toml::to_string(&config).unwrap();

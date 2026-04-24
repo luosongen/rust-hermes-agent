@@ -14,10 +14,18 @@ pub struct CompressionConfig {
     pub model: Option<String>,
 }
 
-fn default_compression_enabled() -> bool { false }
-fn default_threshold() -> u32 { 60000 }
-fn default_target_ratio() -> f32 { 0.7 }
-fn default_protect_last_n() -> u32 { 10 }
+fn default_compression_enabled() -> bool {
+    false
+}
+fn default_threshold() -> u32 {
+    60000
+}
+fn default_target_ratio() -> f32 {
+    0.7
+}
+fn default_protect_last_n() -> u32 {
+    10
+}
 
 impl Default for CompressionConfig {
     fn default() -> Self {

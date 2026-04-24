@@ -5,14 +5,9 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "transport", content = "config")]
 pub enum McpTransport {
     #[serde(rename = "stdio")]
-    Stdio {
-        command: String,
-        args: Vec<String>,
-    },
+    Stdio { command: String, args: Vec<String> },
     #[serde(rename = "http")]
-    Http {
-        url: String,
-    },
+    Http { url: String },
 }
 
 /// MCP server configuration
@@ -24,7 +19,9 @@ pub struct McpServerConfig {
     pub transport: McpTransport,
 }
 
-fn default_mcp_enabled() -> bool { true }
+fn default_mcp_enabled() -> bool {
+    true
+}
 
 /// MCP servers configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

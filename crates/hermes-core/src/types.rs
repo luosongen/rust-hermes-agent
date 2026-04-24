@@ -40,8 +40,14 @@ pub enum Role {
 #[serde(untagged)]
 pub enum Content {
     Text(String),
-    Image { url: String, detail: Option<String> },
-    ToolResult { tool_call_id: String, content: String },
+    Image {
+        url: String,
+        detail: Option<String>,
+    },
+    ToolResult {
+        tool_call_id: String,
+        content: String,
+    },
 }
 
 // =============================================================================

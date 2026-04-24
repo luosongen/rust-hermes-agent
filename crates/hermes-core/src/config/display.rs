@@ -11,9 +11,15 @@ pub struct DisplayConfig {
     pub skin: String,
 }
 
-fn default_compact() -> bool { false }
-fn default_tool_progress() -> bool { true }
-fn default_skin() -> String { "default".to_string() }
+fn default_compact() -> bool {
+    false
+}
+fn default_tool_progress() -> bool {
+    true
+}
+fn default_skin() -> String {
+    "default".to_string()
+}
 
 impl Default for DisplayConfig {
     fn default() -> Self {

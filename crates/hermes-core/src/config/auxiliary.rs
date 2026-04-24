@@ -9,8 +9,12 @@ pub struct VisionConfig {
     pub model: String,
 }
 
-fn default_vision_provider() -> String { "openai".to_string() }
-fn default_vision_model() -> String { "openai/gpt-4o".to_string() }
+fn default_vision_provider() -> String {
+    "openai".to_string()
+}
+fn default_vision_model() -> String {
+    "openai/gpt-4o".to_string()
+}
 
 impl Default for VisionConfig {
     fn default() -> Self {
@@ -30,8 +34,12 @@ pub struct WebExtractConfig {
     pub model: String,
 }
 
-fn default_web_provider() -> String { "openai".to_string() }
-fn default_web_model() -> String { "openai/gpt-4o-mini".to_string() }
+fn default_web_provider() -> String {
+    "openai".to_string()
+}
+fn default_web_model() -> String {
+    "openai/gpt-4o-mini".to_string()
+}
 
 impl Default for WebExtractConfig {
     fn default() -> Self {

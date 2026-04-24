@@ -54,6 +54,11 @@ pub mod context_compressor;
 pub mod traits;
 pub mod delegate;
 pub mod nudge;
+pub mod compression;
+pub mod routing;
+
+pub use compression::{ToolResultPruner, Summarizer, PRUNED_TOOL_PLACEHOLDER};
+pub use routing::{SmartRouter, ComplexityDetector, RouteResolution};
 
 pub use credentials::CredentialPool;
 pub use context_compressor::ContextCompressor;

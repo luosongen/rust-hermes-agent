@@ -47,46 +47,48 @@
 // Submodule declarations
 // ============================================================================
 
-pub mod provider_core;
-pub mod provider_custom;
-pub mod provider;
+pub mod auxiliary;
 pub mod backend;
 pub mod compression;
-pub mod auxiliary;
-pub mod mcp;
-pub mod stt;
 pub mod delegation;
 pub mod display;
+pub mod mcp;
 pub mod personality;
+pub mod provider;
+pub mod provider_core;
+pub mod provider_custom;
+pub mod stt;
 
 // ============================================================================
 // Re-exports for convenience
 // ============================================================================
 
-pub use provider_core::CoreProvider;
-pub use provider_custom::CustomProviderConfig;
-pub use provider::{ProviderSettings, SmartRouterConfig, ProviderModelConfig};
-pub use backend::{BackendConfig, BackendSettings, LocalBackend, DockerBackend, SSHBackend,
-                  SingularityBackend, ModalBackend, DaytonaBackend};
-pub use compression::CompressionConfig;
 pub use auxiliary::AuxiliaryConfig;
-pub use mcp::{McpServersConfig, McpServerConfig, McpTransport};
-pub use stt::{SttConfig, SttProviderConfig};
+pub use backend::{
+    BackendConfig, BackendSettings, DaytonaBackend, DockerBackend, LocalBackend, ModalBackend,
+    SSHBackend, SingularityBackend,
+};
+pub use compression::CompressionConfig;
 pub use delegation::DelegationConfig;
 pub use display::DisplayConfig;
+pub use mcp::{McpServerConfig, McpServersConfig, McpTransport};
 pub use personality::{PersonalityConfig, PersonalityPreset};
+pub use provider::{ProviderModelConfig, ProviderSettings, SmartRouterConfig};
+pub use provider_core::CoreProvider;
+pub use provider_custom::CustomProviderConfig;
+pub use stt::{SttConfig, SttProviderConfig};
 
 // ============================================================================
 // Imports
 // ============================================================================
 
-use serde::{Deserialize, Serialize};
 use crate::nudge::NudgeConfig;
+use parking_lot::Mutex;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
-use parking_lot::Mutex;
 use std::sync::OnceLock;
 
 // ============================================================================
@@ -174,27 +176,27 @@ pub fn config_file() -> PathBuf {
 /// 消息平台的配置结构
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PlatformConfig {
-    pub bot_token: Option<String>,      // Telegram bot token
-    pub verify_token: Option<String>,   // Telegram webhook 验证 token
-    pub corp_id: Option<String>,       // WeCom 企业 ID
-    pub agent_id: Option<String>,      // WeCom 应用 agent ID
-    pub token: Option<String>,         // WeCom token
-    pub aes_key: Option<String>,       // WeCom AES 密钥
+    pub bot_token: Option<String>,    // Telegram bot token
+    pub verify_token: Option<String>, // Telegram webhook 验证 token
+    pub corp_id: Option<String>,      // WeCom 企业 ID
+    pub agent_id: Option<String>,     // WeCom 应用 agent ID
+    pub token: Option<String>,        // WeCom token
+    pub aes_key: Option<String>,      // WeCom AES 密钥
 }
 
 /// 网关配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GatewayConfig {
-    pub port: u16,                          // 网关端口
-    pub host: String,                       // 网关主机地址
-    pub platforms: HashMap<String, PlatformConfig>,  // 已配置的平台
+    pub port: u16,                                  // 网关端口
+    pub host: String,                               // 网关主机地址
+    pub platforms: HashMap<String, PlatformConfig>, // 已配置的平台
 }
 
 /// 默认配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DefaultsConfig {
-    pub model: String,        // 默认模型（如 "openai/gpt-4o"）
-    pub tools_enabled: bool,  // 是否启用工具
+    pub model: String,       // 默认模型（如 "openai/gpt-4o"）
+    pub tools_enabled: bool, // 是否启用工具
 }
 
 /// 工具配置结构
@@ -392,13 +394,19 @@ impl Config {
             self.credentials.insert("anthropic".to_string(), val);
         }
         if let Ok(val) = std::env::var("HERMES_TELEGRAM_BOT_TOKEN") {
-            self.gateway.platforms.entry("telegram".to_string()).or_default();
+            self.gateway
+                .platforms
+                .entry("telegram".to_string())
+                .or_default();
             if let Some(p) = self.gateway.platforms.get_mut("telegram") {
                 p.bot_token = Some(val);
             }
         }
         if let Ok(val) = std::env::var("HERMES_TELEGRAM_VERIFY_TOKEN") {
-            self.gateway.platforms.entry("telegram".to_string()).or_default();
+            self.gateway
+                .platforms
+                .entry("telegram".to_string())
+                .or_default();
             if let Some(p) = self.gateway.platforms.get_mut("telegram") {
                 p.verify_token = Some(val);
             }
@@ -456,8 +464,11 @@ impl Config {
             ["gateway", "port"] => Some(self.gateway.port.to_string()),
             ["gateway", "host"] => Some(self.gateway.host.clone()),
             ["credentials", name] => self.credentials.get(name as &str).cloned(),
-            ["gateway", "platforms", name, field] => {
-                self.gateway.platforms.get(name as &str).and_then(|p| match *field {
+            ["gateway", "platforms", name, field] => self
+                .gateway
+                .platforms
+                .get(name as &str)
+                .and_then(|p| match *field {
                     "bot_token" => p.bot_token.clone(),
                     "verify_token" => p.verify_token.clone(),
                     "corp_id" => p.corp_id.clone(),
@@ -465,11 +476,14 @@ impl Config {
                     "token" => p.token.clone(),
                     "aes_key" => p.aes_key.clone(),
                     _ => None,
-                })
+                }),
+            ["tools", name, "enabled"] => {
+                self.tools.get(name as &str).map(|t| t.enabled.to_string())
             }
-            ["tools", name, "enabled"] => self.tools.get(name as &str).map(|t| t.enabled.to_string()),
             ["environment", "type"] => Some(self.environment.env_type.clone()),
-            ["environment", "working_directory"] => Some(self.environment.working_directory.display().to_string()),
+            ["environment", "working_directory"] => {
+                Some(self.environment.working_directory.display().to_string())
+            }
             ["environment", "docker", "container"] => self.environment.docker.container.clone(),
             ["environment", "ssh", "host"] => self.environment.ssh.host.clone(),
             ["environment", "ssh", "user"] => self.environment.ssh.user.clone(),
@@ -509,7 +523,8 @@ impl Config {
             }
             ["tools", name, "enabled"] => {
                 let enabled = value.parse().unwrap_or(true);
-                self.tools.insert(name.to_string(), ToolConfig::new(enabled));
+                self.tools
+                    .insert(name.to_string(), ToolConfig::new(enabled));
                 true
             }
             ["environment", "type"] => {
@@ -553,23 +568,21 @@ impl Config {
         }
 
         // 序列化为 TOML 格式
-        let toml_str = toml::to_string_pretty(self).map_err(|e| ConfigError::Serialize(e.to_string()))?;
+        let toml_str =
+            toml::to_string_pretty(self).map_err(|e| ConfigError::Serialize(e.to_string()))?;
 
         // 写入并设置安全权限
         fs::write(&path, &toml_str).map_err(ConfigError::Io)?;
 
         // 设置权限为 0o600（仅用户读写）
-        fs::set_permissions(&path, PermissionsExt::from_mode(0o600))
-            .map_err(ConfigError::Io)?;
+        fs::set_permissions(&path, PermissionsExt::from_mode(0o600)).map_err(ConfigError::Io)?;
 
         Ok(())
     }
 
     /// 获取缓存的配置实例（首次调用时加载）
     pub fn get_cached() -> &'static Mutex<Config> {
-        CONFIG_CACHE.get_or_init(|| {
-            Mutex::new(Self::load().expect("failed to load config"))
-        })
+        CONFIG_CACHE.get_or_init(|| Mutex::new(Self::load().expect("failed to load config")))
     }
 
     /// 清除缓存的配置（用于测试）
@@ -660,10 +673,16 @@ mod tests {
     #[test]
     fn test_config_get_set() {
         let mut config = Config::default();
-        assert_eq!(config.get("defaults.model"), Some("openai/gpt-4o".to_string()));
+        assert_eq!(
+            config.get("defaults.model"),
+            Some("openai/gpt-4o".to_string())
+        );
 
         config.set("defaults.model", "anthropic/claude-3".to_string());
-        assert_eq!(config.get("defaults.model"), Some("anthropic/claude-3".to_string()));
+        assert_eq!(
+            config.get("defaults.model"),
+            Some("anthropic/claude-3".to_string())
+        );
     }
 
     #[test]
@@ -675,7 +694,9 @@ mod tests {
     #[test]
     fn test_config_display_redacts_credentials() {
         let mut config = Config::default();
-        config.credentials.insert("openai".to_string(), "sk-abcdef123456".to_string());
+        config
+            .credentials
+            .insert("openai".to_string(), "sk-abcdef123456".to_string());
 
         let display = config.display();
         assert!(display.contains("sk-ab...****"));

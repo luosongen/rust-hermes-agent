@@ -18,8 +18,8 @@
 //! - `ChatRequest`/`ChatResponse` 类型定义在 `types.rs` 中
 //! - `ProviderError` 定义在 `error.rs` 中
 
-use async_trait::async_trait;
 use crate::{ChatRequest, ChatResponse, ModelId, ProviderError, StreamingCallback};
+use async_trait::async_trait;
 
 /// Trait implemented by all LLM provider backends.
 #[async_trait]

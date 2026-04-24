@@ -18,8 +18,8 @@
 //! - 被 `agent.rs` 使用来获取工具定义和执行工具调用
 //! - `ToolCall`、`ToolDefinition`、`ToolContext`、`ToolError` 来自 `types.rs` 和 `error.rs`
 
-use async_trait::async_trait;
 use crate::{ToolCall, ToolContext, ToolDefinition, ToolError};
+use async_trait::async_trait;
 
 /// Abstraction over the tool registry so hermes-core's Agent does not need
 /// to depend on hermes-tool-registry (which already depends on hermes-core).
@@ -29,9 +29,5 @@ pub trait ToolDispatcher: Send + Sync {
     fn get_definitions(&self) -> Vec<ToolDefinition>;
 
     /// Execute a tool call and return its string output.
-    async fn dispatch(
-        &self,
-        call: &ToolCall,
-        context: ToolContext,
-    ) -> Result<String, ToolError>;
+    async fn dispatch(&self, call: &ToolCall, context: ToolContext) -> Result<String, ToolError>;
 }

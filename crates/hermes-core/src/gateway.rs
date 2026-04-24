@@ -28,11 +28,11 @@
 //! - 被 `hermes-platform-telegram` 和 `hermes-platform-wecom` 实现具体平台逻辑
 //! - `ConversationResponse` 来自 `conversation.rs`
 
+use crate::ConversationResponse;
 use async_trait::async_trait;
 use axum::body::Body;
 use axum::extract::Request;
 use chrono::{DateTime, Utc};
-use crate::ConversationResponse;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -81,10 +81,7 @@ pub trait PlatformAdapter: Send + Sync {
     fn verify_webhook(&self, request: &Request<Body>) -> bool;
 
     /// Parse an inbound webhook request into a canonical InboundMessage.
-    async fn parse_inbound(
-        &self,
-        request: Request<Body>,
-    ) -> Result<InboundMessage, GatewayError>;
+    async fn parse_inbound(&self, request: Request<Body>) -> Result<InboundMessage, GatewayError>;
 
     /// Send an AgentResponse back to the platform.
     async fn send_response(

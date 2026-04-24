@@ -18,8 +18,8 @@
 //! - `StorageError` 来自外部的 `hermes-error` crate
 //! - 各错误类型被对应的模块（`agent.rs`、`provider.rs`、`tool_dispatcher.rs` 等）使用
 
-use thiserror::Error;
 pub use hermes_error::StorageError;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum AgentError {
