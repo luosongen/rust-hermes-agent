@@ -30,6 +30,9 @@ pub trait DisplayHandler: Send + Sync {
 
     /// 刷新显示
     fn flush(&self);
+
+    /// 显示 LLM 调用用量
+    fn show_usage(&self, insights: &crate::insights::SessionInsights);
 }
 
 /// 默认无操作实现（当没有 display handler 注册时使用）
@@ -44,6 +47,7 @@ impl DisplayHandler for NoopDisplay {
     fn spinner_start(&self, _message: &str) {}
     fn spinner_stop(&self) {}
     fn flush(&self) {}
+    fn show_usage(&self, _insights: &crate::insights::SessionInsights) {}
 }
 
 impl NoopDisplay {
