@@ -66,8 +66,10 @@ pub mod title_generator;
 pub mod trajectory;
 pub mod usage_pricing;
 pub mod rate_limit_tracker;
+pub mod context_pressure_monitor;
 
 pub use compression::{ToolResultPruner, Summarizer, PRUNED_TOOL_PLACEHOLDER};
+pub use context_pressure_monitor::{ContextPressureMonitor, PressureLevel};
 pub use routing::{SmartRouter, ComplexityDetector, RouteResolution};
 pub use prompt_caching::{AnthropicCache, CacheDispatcher, CacheResult, CacheStrategy, CacheTTL, OpenAiCache};
 pub use error_classifier::{classify_api_error, classify_http_error, ClassifiedError, FailoverReason};

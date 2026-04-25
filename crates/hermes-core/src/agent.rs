@@ -195,6 +195,37 @@ impl Agent {
             let model_id = ModelId::parse(&self.config.model)
                 .unwrap_or_else(|| ModelId::new("openai", "gpt-4o"));
 
+            // ========== Context Pressure Monitoring ==========
+            let context_length = self.provider.context_length(&model_id).unwrap_or(100_000);
+            let prompt_tokens: usize = messages
+                .iter()
+                .map(|m| match &m.content {
+                    crate::Content::Text(t) => self.provider.estimate_tokens(t, &model_id),
+                    crate::Content::Image { .. } => 50,
+                    crate::Content::ToolResult { content, .. } => self.provider.estimate_tokens(content, &model_id),
+                })
+                .sum();
+
+            let monitor = crate::ContextPressureMonitor::new(context_length);
+
+            // Proactive compression check (at critical level before first iteration)
+            if monitor.should_compress(prompt_tokens) && iterations == 0 {
+                let mut compressor = crate::ContextCompressor::new(
+                    self.provider.clone(),
+                    self.config.model.clone(),
+                    context_length,
+                );
+                match compressor.compress(messages.clone(), None, None).await {
+                    Ok(compressed) => {
+                        tracing::info!("Context compressed proactively due to high memory pressure ({} tokens)", prompt_tokens);
+                        messages = compressed;
+                    }
+                    Err(e) => {
+                        tracing::debug!("Proactive compression failed: {}", e);
+                    }
+                }
+            }
+
             let chat_request = ChatRequest {
                 model: model_id.clone(),
                 messages: messages.clone(),
