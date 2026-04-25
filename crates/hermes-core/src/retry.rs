@@ -62,12 +62,13 @@ impl RetryPolicy {
         let capped = delay_ms.min(self.max_delay.as_millis()) as u64;
 
         if self.full_jitter {
-            let jitter = rand::random::<u64>() % capped.max(1);
-            Duration::from_millis(jitter)
+            let jitter_max = capped.max(1);
+            let jitter = 1 + rand::random::<u64>() % (jitter_max - 1);
+            Duration::from_millis(jitter.max(1))
         } else {
             let half = capped / 2;
             let extra = rand::random::<u64>() % half.max(1);
-            Duration::from_millis(half + extra)
+            Duration::from_millis((half + extra).max(1))
         }
     }
 }
