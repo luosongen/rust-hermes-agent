@@ -206,7 +206,7 @@ pub fn load_skill_registry() -> Arc<RwLock<SkillRegistry>> {
     registry
 }
 
-use hermes_skills::manager::{SkillManager, CreateResult, EditResult, PatchResult, DeleteResult, WriteFileResult, RemoveFileResult};
+use hermes_skills::manager::SkillManager;
 
 /// Built-in skill management tool.
 ///
