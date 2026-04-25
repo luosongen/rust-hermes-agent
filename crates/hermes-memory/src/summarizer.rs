@@ -47,12 +47,9 @@ impl Summarizer {
         }
     }
 
-    async fn summarize_openai(
-        &self,
-        messages: &[Message],
-    ) -> Result<String, CompressionError> {
-        // Build conversation context
-        let context = messages
+    /// Build context string from messages (private helper method)
+    fn build_context(&self, messages: &[Message]) -> String {
+        messages
             .iter()
             .filter_map(|m| {
                 let role = &m.role;
@@ -64,15 +61,20 @@ impl Summarizer {
                 }
             })
             .collect::<Vec<_>>()
-            .join("\n");
+            .join("\n")
+    }
+
+    async fn summarize_openai(
+        &self,
+        messages: &[Message],
+    ) -> Result<String, CompressionError> {
+        let context = self.build_context(messages);
 
         let prompt = format!(
             "Summarize the following conversation concisely, capturing the key points and any important details:\n\n{}\n\nSummary:",
             context
         );
 
-        // For OpenAI, we use the chat completions API
-        // The API key should come from environment or config
         let api_key = std::env::var("OPENAI_API_KEY")
             .map_err(|_| CompressionError::Config("OPENAI_API_KEY not set".into()))?;
 
@@ -83,8 +85,7 @@ impl Summarizer {
             "temperature": 0.3
         });
 
-        let client = reqwest::Client::new();
-        let response = client
+        let response = self.http_client
             .post("https://api.openai.com/v1/chat/completions")
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
@@ -135,19 +136,7 @@ impl Summarizer {
         let ollama_url = self.config.ollama_url.as_ref()
             .ok_or_else(|| CompressionError::Config("Ollama URL not configured".into()))?;
 
-        let context = messages
-            .iter()
-            .filter_map(|m| {
-                let role = &m.role;
-                let content = m.content.as_deref().unwrap_or("");
-                if content.is_empty() {
-                    None
-                } else {
-                    Some(format!("{}: {}", role, content))
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
+        let context = self.build_context(messages);
 
         let request = serde_json::json!({
             "model": self.config.model,
@@ -186,7 +175,6 @@ impl Summarizer {
     }
 
     async fn embed_openai(&self, text: &str) -> Result<Vec<f32>, CompressionError> {
-        // Use OpenAI embeddings API
         let api_key = std::env::var("OPENAI_API_KEY")
             .map_err(|_| CompressionError::Config("OPENAI_API_KEY not set".into()))?;
 
@@ -195,8 +183,7 @@ impl Summarizer {
             "input": text
         });
 
-        let client = reqwest::Client::new();
-        let response = client
+        let response = self.http_client
             .post("https://api.openai.com/v1/embeddings")
             .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
