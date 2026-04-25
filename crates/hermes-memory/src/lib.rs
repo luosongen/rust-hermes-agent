@@ -27,6 +27,7 @@
 
 pub mod builtin;
 pub mod compressed;
+pub mod compression_config;
 pub mod session;
 pub mod sqlite_store;
 pub mod memory_manager;
