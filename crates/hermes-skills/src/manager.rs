@@ -163,7 +163,7 @@ impl SkillManager {
     }
 
     /// 查找 skill 目录
-    fn find_skill_dir(&self, name: &str) -> Option<PathBuf> {
+    pub(crate) fn find_skill_dir(&self, name: &str) -> Option<PathBuf> {
         // 直接检查顶层
         let direct = self.skills_dir.join(name);
         if direct.exists() {
