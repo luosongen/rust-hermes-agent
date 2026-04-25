@@ -1422,6 +1422,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "hermes-platform-weixin"
+version = "0.1.0"
+dependencies = [
+ "aes",
+ "anyhow",
+ "async-trait",
+ "axum",
+ "base64",
+ "chrono",
+ "hermes-core",
+ "mockito",
+ "reqwest",
+ "serde",
+ "serde-xml-rs",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "hermes-provider"
 version = "0.1.0"
 dependencies = [

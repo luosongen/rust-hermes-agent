@@ -47,6 +47,7 @@ hermes-gateway = { path = "crates/hermes-gateway" }
 hermes-platform-telegram = { path = "crates/hermes-platform-telegram" }
 hermes-platform-wecom = { path = "crates/hermes-platform-wecom" }
 hermes-platform-feishu = { path = "crates/hermes-platform-feishu" }
+hermes-platform-weixin = { path = "crates/hermes-platform-weixin" }
 hermes-environment = { path = "crates/hermes-environment" }
 hermes-provider = { path = "crates/hermes-provider" }
 hermes-cron = { path = "crates/hermes-cron" }
