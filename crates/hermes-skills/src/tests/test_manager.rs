@@ -156,4 +156,39 @@ mod tests {
         let result = manager.remove_file("test-skill", "references/api.md");
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_patch_skill() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = SkillManager::with_dir(temp_dir.path().to_path_buf());
+
+        let content = "---\nname: test\ndescription: test\n---\n# Old Content";
+        manager.create("test-skill", content, None).unwrap();
+
+        let result = manager.patch("test-skill", "Old", "New", false, None);
+        assert!(result.is_ok());
+
+        // 验证内容已更新
+        let skill_dir = manager.find_skill_dir("test-skill").unwrap();
+        let new_content = std::fs::read_to_string(skill_dir.join("SKILL.md")).unwrap();
+        assert!(new_content.contains("New"));
+        assert!(!new_content.contains("Old"));
+    }
+
+    #[test]
+    fn test_patch_replace_all() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = SkillManager::with_dir(temp_dir.path().to_path_buf());
+
+        let content = "---\nname: test\ndescription: test\n---\n# Foo Foo Foo";
+        manager.create("test-skill", content, None).unwrap();
+
+        let result = manager.patch("test-skill", "Foo", "Bar", true, None);
+        assert!(result.is_ok());
+
+        // 验证所有 Foo 都被替换
+        let skill_dir = manager.find_skill_dir("test-skill").unwrap();
+        let new_content = std::fs::read_to_string(skill_dir.join("SKILL.md")).unwrap();
+        assert!(new_content.contains("Bar Bar Bar"));
+    }
 }
