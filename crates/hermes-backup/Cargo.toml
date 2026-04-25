@@ -1,0 +1,22 @@
+[package]
+name = "hermes-backup"
+version.workspace = true
+edition = "2021"
+description = "Backup and restore system for hermes-agent"
+
+[dependencies]
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+flate2 = "1.0"
+tar = "0.4"
+zip = "2.2"
+sha2 = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
