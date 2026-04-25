@@ -45,4 +45,16 @@ pub enum SkillError {
 
     #[error("Invalid input: {0}")]
     InvalidInput(String),
+
+    #[error("Temp file error: {0}")]
+    TempFile(String),
+
+    #[error("Patch error: {0}")]
+    Patch(String),
+}
+
+impl From<tempfile::PersistError> for SkillError {
+    fn from(e: tempfile::PersistError) -> Self {
+        SkillError::TempFile(e.to_string())
+    }
 }

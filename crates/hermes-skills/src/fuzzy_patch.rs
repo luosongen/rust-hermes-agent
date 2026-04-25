@@ -7,6 +7,12 @@ pub struct FuzzyPatch {
     matcher: SkimMatcherV2,
 }
 
+impl Clone for FuzzyPatch {
+    fn clone(&self) -> Self {
+        Self::new()
+    }
+}
+
 impl Default for FuzzyPatch {
     fn default() -> Self {
         Self::new()

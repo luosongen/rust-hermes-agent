@@ -4,7 +4,6 @@
 
 use crate::error::SkillError;
 use crate::fuzzy_patch::FuzzyPatch;
-use crate::loader::SkillLoader;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::fs;
@@ -24,7 +23,6 @@ const ALLOWED_SUBDIRS: &[&str] = &["references", "templates", "scripts", "assets
 static VALID_NAME_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-z0-9][a-z0-9._-]*$").unwrap());
 
 /// SkillManager 处理所有技能管理操作
-#[derive(Clone)]
 pub struct SkillManager {
     skills_dir: PathBuf,
     fuzzy_patch: FuzzyPatch,
@@ -100,24 +98,30 @@ impl SkillManager {
                 "SKILL.md must start with YAML frontmatter (---).".into()
             ));
         }
-        // Parse and validate required fields
-        let (frontmatter, body) = crate::loader::Skill::parse_frontmatter(content)
-            .map_err(|e| SkillError::InvalidInput(format!("Frontmatter error: {}", e)))?;
 
-        // 验证 description 字段长度
-        if let Ok(parsed) = serde_yaml::from_str::<serde_yaml::Value>(&frontmatter) {
-            if let Some(desc) = parsed.get("description").and_then(|v| v.as_str()) {
-                if desc.len() > MAX_DESCRIPTION_LENGTH {
-                    return Err(SkillError::InvalidInput(
-                        format!("Description exceeds {} characters.", MAX_DESCRIPTION_LENGTH)
-                    ));
+        // 直接解析 YAML 验证 description 长度
+        if let Some(end) = content[3..].find("\n---") {
+            let frontmatter = &content[3..end];
+            if let Ok(parsed) = serde_yaml::from_str::<serde_yaml::Value>(frontmatter) {
+                if let Some(desc) = parsed.get("description").and_then(|v| v.as_str()) {
+                    if desc.len() > MAX_DESCRIPTION_LENGTH {
+                        return Err(SkillError::InvalidInput(
+                            format!("Description exceeds {} characters.", MAX_DESCRIPTION_LENGTH)
+                        ));
+                    }
                 }
             }
-        }
 
-        if body.trim().is_empty() {
+            // 检查 body 不为空
+            let body = content[3..].split_at(end).1[4..].trim();
+            if body.is_empty() {
+                return Err(SkillError::InvalidInput(
+                    "SKILL.md must have content after the frontmatter.".into()
+                ));
+            }
+        } else {
             return Err(SkillError::InvalidInput(
-                "SKILL.md must have content after the frontmatter.".into()
+                "SKILL.md must have closing --- delimiter.".into()
             ));
         }
         Ok(())
@@ -154,7 +158,7 @@ impl SkillManager {
 
         let mut temp_file = NamedTempFile::new_in(parent)?;
         std::io::Write::write_all(&mut temp_file, content.as_bytes())?;
-        temp_file.persist(path)?;
+        temp_file.persist(path).map_err(|e| SkillError::TempFile(e.to_string()))?;
         Ok(())
     }
 
@@ -257,7 +261,8 @@ impl SkillManager {
             content.replace(old_string, new_string)
         } else {
             // 精确匹配一次
-            self.fuzzy_patch.patch(&content, old_string, new_string)?
+            self.fuzzy_patch.patch(&content, old_string, new_string)
+                .map_err(SkillError::Patch)?
         };
 
         // 验证 frontmatter 仍然有效（如果是 SKILL.md）
