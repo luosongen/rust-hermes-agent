@@ -344,7 +344,7 @@ impl hermes_tool_registry::Tool for SkillManageTool {
             }
         };
 
-        Ok(serde_json::to_string(&result).unwrap())
+        Ok(serde_json::to_string(&result).map_err(|e| ToolError::Execution(e.to_string()))?)
     }
 }
 
