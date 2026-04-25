@@ -155,10 +155,91 @@ impl PlatformAdapter for FeishuAdapter {
         // 飞书消息内容是 JSON 字符串，需要进一步解析
         let content = if let Some(content_str) = &message_event.content {
             if let Ok(content_json) = serde_json::from_str::<serde_json::Value>(content_str) {
-                content_json["text"]
-                    .as_str()
-                    .unwrap_or(content_str)
-                    .to_string()
+                let message_type = message_event.message_type.as_deref().unwrap_or("text");
+
+                match message_type {
+                    "text" => {
+                        // 文本消息：提取 text 字段
+                        content_json["text"]
+                            .as_str()
+                            .unwrap_or(content_str)
+                            .to_string()
+                    }
+                    "post" => {
+                        // 富文本消息：提取 text 字段（飞书 post 类型包含 text 和 rich_text）
+                        // rich_text 结构复杂，先提取 text 作为预览
+                        if let Some(text) = content_json["text"].as_str() {
+                            text.to_string()
+                        } else {
+                            // 如果没有 text 字段，尝试提取 rich_text 中的文本
+                            let rich_text = &content_json["rich_text"];
+                            if let Some(elements) = rich_text.get("elements").and_then(|e| e.as_array()) {
+                                let mut parts = Vec::new();
+                                for item in elements {
+                                    if let Some(text_content) = item.get("text").and_then(|t| t.as_str()) {
+                                        parts.push(text_content.to_string());
+                                    }
+                                }
+                                if !parts.is_empty() {
+                                    parts.join("")
+                                } else {
+                                    content_str.clone()
+                                }
+                            } else {
+                                content_str.clone()
+                            }
+                        }
+                    }
+                    "image" => {
+                        // 图片消息：提取 image_key
+                        let key = content_json["image_key"]
+                            .as_str()
+                            .unwrap_or("unknown");
+                        format!("[图片] {}", key)
+                    }
+                    "audio" => {
+                        // 音频消息：提取 audio_key
+                        let key = content_json["audio_key"]
+                            .as_str()
+                            .unwrap_or("unknown");
+                        format!("[音频] {}", key)
+                    }
+                    "video" => {
+                        // 视频消息：提取 video_key
+                        let key = content_json["video_key"]
+                            .as_str()
+                            .unwrap_or("unknown");
+                        format!("[视频] {}", key)
+                    }
+                    "file" => {
+                        // 文件消息：提取 file_key
+                        let key = content_json["file_key"]
+                            .as_str()
+                            .unwrap_or("unknown");
+                        format!("[文件] {}", key)
+                    }
+                    "sticker" => {
+                        // 表情消息：提取 sticker_id
+                        let key = content_json["sticker_id"]
+                            .as_str()
+                            .unwrap_or("unknown");
+                        format!("[表情] {}", key)
+                    }
+                    "media" => {
+                        // 媒体消息（旧版格式）：提取 file_key
+                        let key = content_json["file_key"]
+                            .as_str()
+                            .unwrap_or("unknown");
+                        format!("[媒体] {}", key)
+                    }
+                    _ => {
+                        // 未知消息类型，尝试提取 text 字段，否则返回原始内容
+                        content_json["text"]
+                            .as_str()
+                            .unwrap_or(content_str)
+                            .to_string()
+                    }
+                }
             } else {
                 content_str.clone()
             }

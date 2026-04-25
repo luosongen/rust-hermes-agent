@@ -48,26 +48,6 @@ impl Default for DingTalkAdapter {
     }
 }
 
-/// 钉钉消息类型映射
-const DINGTALK_TYPE_MAPPING: &[(&str, &str)] = &[
-    ("picture", "image"),
-    ("voice", "audio"),
-];
-
-/// 钉钉会话消息
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DingTalkMessage {
-    pub msg_id: Option<String>,
-    pub conversation_id: Option<String>,
-    pub conversation_type: Option<String>,
-    pub sender_id: Option<String>,
-    pub sender_nick: Option<String>,
-    pub session_webhook: Option<String>,
-    pub text: Option<DingTalkText>,
-    pub robot_code: Option<String>,
-    pub create_at: Option<i64>,
-}
-
 /// 钉钉文本消息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DingTalkText {
@@ -88,6 +68,12 @@ pub struct DingTalkCallback {
     pub create_at: Option<i64>,
     #[serde(rename = "isInAtList")]
     pub is_in_at_list: Option<bool>,
+    /// 图片消息的图片URL
+    pub picture_url: Option<String>,
+    /// 音频消息的语音URL
+    pub voice_url: Option<String>,
+    /// 视频消息的视频URL
+    pub video_url: Option<String>,
 }
 
 #[async_trait]
@@ -133,11 +119,18 @@ impl PlatformAdapter for DingTalkAdapter {
                 .insert(chat_id.clone(), (webhook.clone(), expired_time));
         }
 
-        let content = callback
-            .text
-            .as_ref()
-            .map(|t| t.content.clone())
-            .unwrap_or_default();
+        // 构建消息内容，支持文本、图片、音频、视频多种消息类型
+        let content = if let Some(text) = &callback.text {
+            text.content.clone()
+        } else if let Some(picture_url) = &callback.picture_url {
+            format!("[图片] {}", picture_url)
+        } else if let Some(voice_url) = &callback.voice_url {
+            format!("[音频] {}", voice_url)
+        } else if let Some(video_url) = &callback.video_url {
+            format!("[视频] {}", video_url)
+        } else {
+            String::new()
+        };
 
         Ok(InboundMessage {
             platform: "dingtalk".to_string(),
