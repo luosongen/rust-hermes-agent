@@ -76,22 +76,25 @@ impl PlatformAdapter for EmailAdapter {
     }
 
     fn verify_webhook(&self, request: &Request<Body>) -> bool {
-        // Get webhook config
-        let webhook_config = self.webhook_config.clone();
-        let config_guard = tokio::runtime::Handle::current().block_on(async {
-            webhook_config.read().await
-        });
+        // 只进行同步检查：验证必要头部是否存在
+        // 实际的签名验证在 parse_inbound 中进行（那里有完整body和async支持）
+        let headers = request.headers();
 
-        let config = match config_guard.as_ref() {
-            Some(cfg) => cfg,
-            None => return false,
-        };
+        // 检查 SendGrid 签名头部是否存在
+        if headers.contains_key("X-Twilio-Email-Event-Webhook-Signature") {
+            return true;
+        }
 
-        // For each provider, verify the signature
-        for provider in &config.providers {
-            if verify_webhook_signature(request, provider, &config.secret).is_ok() {
-                return true;
-            }
+        // 检查 Mailgun 签名头部
+        if headers.contains_key("Mailgun-Events-Signature") {
+            return true;
+        }
+
+        // 检查 SES 签名头部
+        if headers.contains_key("X-Ses-Sns-Subscription-Arn")
+            || headers.contains_key("X-Ses-Sns-Topic-Arn")
+        {
+            return true;
         }
 
         false

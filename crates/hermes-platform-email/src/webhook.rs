@@ -53,38 +53,109 @@ pub fn verify_sendgrid(payload: &[u8], signature: &str, secret: &str) -> Result<
 }
 
 /// Verify Mailgun webhook signature
-/// Mailgun uses HMAC SHA256 with the public key
+/// Mailgun uses HMAC SHA256 with the public key (webhook API key)
+/// Signature = HMAC-SHA256(api_key, timestamp + token)
 pub fn verify_mailgun(
-    _timestamp: &str,
-    _token: &str,
-    _signature: &str,
-    _public_key: &str,
+    timestamp: &str,
+    token: &str,
+    signature: &str,
+    api_key: &str,
 ) -> Result<(), EmailError> {
-    // Mailgun verification requires the public key for RSA verification
-    // For now, return Ok as the implementation requires additional crypto setup
-    Ok(())
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+
+    type HmacSha256 = Hmac<Sha256>;
+
+    // Mailgun: signature = HMAC-SHA256(api_key, timestamp + token)
+    let mut mac = HmacSha256::new_from_slice(api_key.as_bytes())
+        .map_err(|_| EmailError::WebhookVerificationFailed)?;
+
+    // Concatenate timestamp and token
+    let mut data = timestamp.as_bytes().to_vec();
+    data.extend_from_slice(token.as_bytes());
+    mac.update(&data);
+
+    let result = mac.finalize();
+    let expected = base64::Engine::decode(
+        &base64::engine::general_purpose::STANDARD,
+        signature,
+    )
+    .map_err(|_| EmailError::WebhookVerificationFailed)?;
+
+    // Get the bytes once to avoid moved value issues
+    let result_bytes = result.into_bytes();
+
+    // Use constant-time comparison
+    if result_bytes.len() != expected.len() {
+        return Err(EmailError::WebhookVerificationFailed);
+    }
+
+    let mut diff = 0u8;
+    for (a, b) in result_bytes.iter().zip(expected.iter()) {
+        diff |= a ^ b;
+    }
+
+    if diff == 0 {
+        Ok(())
+    } else {
+        Err(EmailError::WebhookVerificationFailed)
+    }
 }
 
 /// Verify SES webhook signature
-/// AWS SES uses HMAC SHA256 with the signing key
+/// AWS SES uses HMAC SHA256 for message verification
+/// The signing key is derived from the receipt rule settings
 #[allow(dead_code)]
 pub fn verify_ses(
-    _message: &str,
-    _signature: &str,
-    _signing_key: &str,
+    message: &str,
+    signature: &str,
+    signing_key: &str,
     _certificate: &str,
 ) -> Result<(), EmailError> {
-    // SES verification requires the message to be verified against
-    // the signature using the signing key or certificate
-    // For now, return Ok as the implementation requires additional setup
-    Ok(())
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+
+    type HmacSha256 = Hmac<Sha256>;
+
+    // SES signature verification
+    let mut mac = HmacSha256::new_from_slice(signing_key.as_bytes())
+        .map_err(|_| EmailError::WebhookVerificationFailed)?;
+    mac.update(message.as_bytes());
+
+    let result = mac.finalize();
+
+    // Decode base64 signature
+    let expected = base64::Engine::decode(
+        &base64::engine::general_purpose::STANDARD,
+        signature,
+    )
+    .map_err(|_| EmailError::WebhookVerificationFailed)?;
+
+    // Get bytes once to avoid moved value issues
+    let result_bytes = result.into_bytes();
+
+    // Use constant-time comparison
+    if result_bytes.len() != expected.len() {
+        return Err(EmailError::WebhookVerificationFailed);
+    }
+
+    let mut diff = 0u8;
+    for (a, b) in result_bytes.iter().zip(expected.iter()) {
+        diff |= a ^ b;
+    }
+
+    if diff == 0 {
+        Ok(())
+    } else {
+        Err(EmailError::WebhookVerificationFailed)
+    }
 }
 
 /// Verify webhook signature based on provider
 pub fn verify_webhook_signature(
     request: &Request<Body>,
     provider: &WebhookProvider,
-    secret: &str,
+    _secret: &str,
 ) -> Result<(), EmailError> {
     match provider {
         WebhookProvider::SendGrid => {
