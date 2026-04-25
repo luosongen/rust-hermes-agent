@@ -101,8 +101,20 @@ impl SkillManager {
             ));
         }
         // Parse and validate required fields
-        let (_, body) = crate::loader::Skill::parse_frontmatter(content)
+        let (frontmatter, body) = crate::loader::Skill::parse_frontmatter(content)
             .map_err(|e| SkillError::InvalidInput(format!("Frontmatter error: {}", e)))?;
+
+        // 验证 description 字段长度
+        if let Ok(parsed) = serde_yaml::from_str::<serde_yaml::Value>(&frontmatter) {
+            if let Some(desc) = parsed.get("description").and_then(|v| v.as_str()) {
+                if desc.len() > MAX_DESCRIPTION_LENGTH {
+                    return Err(SkillError::InvalidInput(
+                        format!("Description exceeds {} characters.", MAX_DESCRIPTION_LENGTH)
+                    ));
+                }
+            }
+        }
+
         if body.trim().is_empty() {
             return Err(SkillError::InvalidInput(
                 "SKILL.md must have content after the frontmatter.".into()
