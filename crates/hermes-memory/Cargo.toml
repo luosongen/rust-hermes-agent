@@ -17,6 +17,7 @@ parking_lot.workspace = true
 regex.workspace = true
 async-trait.workspace = true
 hermes-error.workspace = true
+reqwest.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

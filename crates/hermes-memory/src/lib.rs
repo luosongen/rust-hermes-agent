@@ -28,10 +28,12 @@
 pub mod builtin;
 pub mod compressed;
 pub mod compression_config;
+pub mod compression_error;
 pub mod session;
 pub mod sqlite_store;
 pub mod memory_manager;
 pub mod search;
+pub mod summarizer;
 #[cfg(test)]
 mod tests;
 
