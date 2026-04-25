@@ -35,7 +35,7 @@
 //! - `Migration` — schema 初始化失败
 //! - `Query` — SQL 查询执行失败
 
-use crate::{Message, NewMessage, NewSession, SearchResult, Session, SessionStore};
+use crate::{Message, NewMessage, NewSession, SearchResult, Session, SessionStore, compressed::CompressedSegment};
 use async_trait::async_trait;
 use hermes_error::StorageError;
 use sqlx::{SqlitePool, FromRow};
@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS messages (
     tool_calls TEXT,
     tool_name TEXT,
     timestamp REAL NOT NULL,
+    compressed INTEGER DEFAULT 0,
     token_count INTEGER,
     finish_reason TEXT,
     reasoning TEXT,
@@ -108,6 +109,19 @@ CREATE TABLE IF NOT EXISTS memory (
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS compressed_segments (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    start_message_id INTEGER NOT NULL,
+    end_message_id INTEGER NOT NULL,
+    summary TEXT NOT NULL,
+    vector BLOB NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (session_id) REFERENCES sessions(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_compressed_session ON compressed_segments(session_id);
 "#;
 
 pub struct SqliteSessionStore {
@@ -497,5 +511,106 @@ impl SessionStore for SqliteSessionStore {
         .await
         .map_err(|e| StorageError::Query(e.to_string()))?;
         Ok(rows.into_iter().map(|r| r.into()).collect())
+    }
+}
+
+impl SqliteSessionStore {
+    /// Insert a compressed segment
+    pub async fn insert_compressed_segment(
+        &self,
+        segment: &CompressedSegment,
+    ) -> Result<(), StorageError> {
+        let vector_bytes: Vec<u8> = segment
+            .vector
+            .iter()
+            .flat_map(|f| f.to_le_bytes())
+            .collect();
+
+        sqlx::query(
+            r#"INSERT INTO compressed_segments
+               (id, session_id, start_message_id, end_message_id, summary, vector, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)"#
+        )
+        .bind(&segment.id)
+        .bind(&segment.session_id)
+        .bind(segment.start_message_id)
+        .bind(segment.end_message_id)
+        .bind(&segment.summary)
+        .bind(&vector_bytes)
+        .bind(segment.created_at.to_rfc3339())
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StorageError::Query(e.to_string()))?;
+
+        Ok(())
+    }
+
+    /// Mark messages as compressed
+    pub async fn mark_messages_compressed(
+        &self,
+        session_id: &str,
+        start_id: i64,
+        end_id: i64,
+    ) -> Result<(), StorageError> {
+        sqlx::query(
+            "UPDATE messages SET compressed = 1 WHERE session_id = ? AND id >= ? AND id <= ?"
+        )
+        .bind(session_id)
+        .bind(start_id)
+        .bind(end_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StorageError::Query(e.to_string()))?;
+
+        Ok(())
+    }
+
+    /// Get compressed segments for a session
+    pub async fn get_compressed_segments(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<CompressedSegment>, StorageError> {
+        #[derive(sqlx::FromRow)]
+        struct Row {
+            id: String,
+            session_id: String,
+            start_message_id: i64,
+            end_message_id: i64,
+            summary: String,
+            vector: Vec<u8>,
+            created_at: String,
+        }
+
+        let rows: Vec<Row> = sqlx::query_as(
+            "SELECT * FROM compressed_segments WHERE session_id = ? ORDER BY start_message_id"
+        )
+        .bind(session_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StorageError::Query(e.to_string()))?;
+
+        let segments = rows
+            .into_iter()
+            .map(|r| {
+                let vector: Vec<f32> = r.vector
+                    .chunks_exact(4)
+                    .map(|chunk| f32::from_le_bytes(chunk.try_into().unwrap()))
+                    .collect();
+
+                CompressedSegment {
+                    id: r.id,
+                    session_id: r.session_id,
+                    start_message_id: r.start_message_id,
+                    end_message_id: r.end_message_id,
+                    summary: r.summary,
+                    vector,
+                    created_at: chrono::DateTime::parse_from_rfc3339(&r.created_at)
+                        .unwrap()
+                        .with_timezone(&chrono::Utc),
+                }
+            })
+            .collect();
+
+        Ok(segments)
     }
 }
