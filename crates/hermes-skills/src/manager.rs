@@ -5,6 +5,8 @@
 use crate::error::SkillError;
 use crate::fuzzy_patch::FuzzyPatch;
 use crate::loader::SkillLoader;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
@@ -18,8 +20,8 @@ const MAX_SUPPORT_FILE_BYTES: usize = 1_048_576;
 /// 允许的子目录
 const ALLOWED_SUBDIRS: &[&str] = &["references", "templates", "scripts", "assets"];
 
-/// Skill 名称验证正则
-const VALID_NAME_RE: &str = r"^[a-z0-9][a-z0-9._-]*$";
+/// Skill 名称验证正则（静态缓存）
+static VALID_NAME_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-z0-9][a-z0-9._-]*$").unwrap());
 
 /// SkillManager 处理所有技能管理操作
 #[derive(Clone)]
@@ -64,8 +66,7 @@ impl SkillManager {
                 format!("Skill name exceeds {} characters.", MAX_NAME_LENGTH)
             ));
         }
-        let re = regex::Regex::new(VALID_NAME_RE).unwrap();
-        if !re.is_match(name) {
+        if !VALID_NAME_RE.is_match(name) {
             return Err(SkillError::InvalidInput(
                 "Invalid skill name. Use lowercase letters, numbers, hyphens, dots, and underscores.".into()
             ));
@@ -81,8 +82,7 @@ impl SkillManager {
         if category.len() > MAX_NAME_LENGTH {
             return Err(SkillError::InvalidInput("Category exceeds maximum length.".into()));
         }
-        let re = regex::Regex::new(VALID_NAME_RE).unwrap();
-        if !re.is_match(category) {
+        if !VALID_NAME_RE.is_match(category) {
             return Err(SkillError::InvalidInput(
                 "Invalid category name.".into()
             ));
@@ -208,7 +208,7 @@ impl SkillManager {
         Ok(CreateResult {
             success: true,
             message: format!("Skill '{}' created.", name),
-            path: skill_dir.to_string_lossy().into_owned(),
+            path: skill_dir.display().to_string(),
             category: category.map(String::from),
         })
     }
@@ -226,7 +226,7 @@ impl SkillManager {
         Ok(EditResult {
             success: true,
             message: format!("Skill '{}' updated.", name),
-            path: skill_dir.to_string_lossy().into_owned(),
+            path: skill_dir.display().to_string(),
         })
     }
 
