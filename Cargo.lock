@@ -1150,6 +1150,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "hermes-platform-slack"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "chrono",
+ "hermes-core",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "url",
+ "urlencoding",
+]
+
+[[package]]
 name = "hermes-platform-telegram"
 version = "0.1.0"
 dependencies = [
