@@ -149,12 +149,22 @@ impl SkillManager {
         }
     }
 
-    /// 原子性写入文件
-    fn atomic_write(path: &Path, content: &str) -> Result<(), SkillError> {
+    /// 原子性写入文件（带路径遍历保护）
+    fn atomic_write(path: &Path, content: &str, skill_dir: &Path) -> Result<(), SkillError> {
         let parent = path.parent().ok_or_else(||
             SkillError::InvalidPath("Cannot determine parent directory".into())
         )?;
         fs::create_dir_all(parent)?;
+
+        // 安全检查：确保最终路径在 skill_dir 下（防止 ../ 路径遍历）
+        let canonical_parent = parent.canonicalize()
+            .map_err(|e| SkillError::InvalidPath(format!("Cannot resolve path: {}", e)))?;
+        let canonical_skill_dir = skill_dir.canonicalize()
+            .map_err(|e| SkillError::InvalidPath(format!("Cannot resolve skill dir: {}", e)))?;
+
+        if !canonical_parent.starts_with(&canonical_skill_dir) {
+            return Err(SkillError::InvalidInput("Path outside skill directory.".into()));
+        }
 
         let mut temp_file = NamedTempFile::new_in(parent)?;
         std::io::Write::write_all(&mut temp_file, content.as_bytes())?;
@@ -207,7 +217,7 @@ impl SkillManager {
 
         // 写入 SKILL.md
         let skill_md = skill_dir.join("SKILL.md");
-        Self::atomic_write(&skill_md, content)?;
+        Self::atomic_write(&skill_md, content, &skill_dir)?;
 
         Ok(CreateResult {
             success: true,
@@ -225,7 +235,7 @@ impl SkillManager {
             .ok_or_else(|| SkillError::NotFound(format!("Skill '{}' not found", name)))?;
 
         let skill_md = skill_dir.join("SKILL.md");
-        Self::atomic_write(&skill_md, content)?;
+        Self::atomic_write(&skill_md, content, &skill_dir)?;
 
         Ok(EditResult {
             success: true,
@@ -270,7 +280,7 @@ impl SkillManager {
             Self::validate_frontmatter(&patched_content)?;
         }
 
-        Self::atomic_write(&target, &patched_content)?;
+        Self::atomic_write(&target, &patched_content, &skill_dir)?;
 
         Ok(PatchResult {
             success: true,
@@ -316,7 +326,7 @@ impl SkillManager {
         }
 
         let target = skill_dir.join(file_path);
-        Self::atomic_write(&target, file_content)?;
+        Self::atomic_write(&target, file_content, &skill_dir)?;
 
         Ok(WriteFileResult {
             success: true,
