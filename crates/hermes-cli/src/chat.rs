@@ -34,7 +34,7 @@ use hermes_environment::{EnvironmentManager, LocalEnvironment};
 use hermes_memory::{NewSession, SessionStore, SqliteSessionStore};
 use hermes_provider::OpenAiProvider;
 use hermes_tool_registry::ToolRegistry;
-use hermes_tools_builtin::register_builtin_tools;
+use hermes_tools_builtin::{register_builtin_tools, register_skill_tools, load_skill_registry_and_manager};
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
@@ -95,6 +95,9 @@ pub async fn run_chat(
     // 如果未禁用工具，注册内置工具（注入 Environment）
     if !no_tools {
         register_builtin_tools(&tool_registry, environment.clone());
+        // 加载技能注册表和管理器，并注册技能管理工具
+        let (_, skill_manager) = load_skill_registry_and_manager();
+        register_skill_tools(&tool_registry, skill_manager);
     }
 
     // 构建 LLM Provider
