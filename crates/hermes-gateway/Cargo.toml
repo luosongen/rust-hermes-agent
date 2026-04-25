@@ -20,6 +20,12 @@ tower.workspace = true
 tower-http.workspace = true
 hermes-core.workspace = true
 hermes-memory.workspace = true
+hermes-platform-telegram.workspace = true
+hermes-platform-wecom.workspace = true
+hermes-platform-dingtalk.workspace = true
+hermes-platform-feishu.workspace = true
+hermes-platform-weixin.workspace = true
+hermes-platform-sms.workspace = true
 
 [dev-dependencies]
 axum.workspace = true

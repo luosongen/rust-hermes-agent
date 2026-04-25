@@ -1,10 +1,10 @@
 //! ## hermes-gateway
 //!
-//! HTTP 网关模块，负责接收各平台（Telegram、WeCom）的 Webhook 请求，
+//! HTTP 网关模块，负责接收各平台（Telegram、WeCom、DingTalk、Feishu、Weixin、SMS）的 Webhook 请求，
 //! 并将消息转发给 `Agent` 进行处理。
 //!
 //! ### 主要职责
-//! - 提供 HTTP 接口 `/health`、`/webhook/telegram`、`/webhook/wecom`
+//! - 提供 HTTP 接口 `/health`、`/webhook/telegram`、`/webhook/wecom`、`/webhook/dingtalk`、`/webhook/feishu`、`/webhook/weixin`、`/webhook/sms`
 //! - 管理多个平台适配器（`PlatformAdapter`），根据平台标识路由请求
 //! - 验证 Webhook 请求的合法性
 //! - 将入站消息转换为 `InboundMessage`，交由 Agent 处理后回传响应
@@ -66,6 +66,10 @@ impl Gateway {
             .route("/health", axum::routing::get(health_handler))
             .route("/webhook/telegram", post(webhook_telegram))
             .route("/webhook/wecom", post(webhook_wecom))
+            .route("/webhook/dingtalk", post(webhook_dingtalk))
+            .route("/webhook/feishu", post(webhook_feishu))
+            .route("/webhook/weixin", post(webhook_weixin))
+            .route("/webhook/sms", post(webhook_sms))
             .with_state(Arc::new(GatewayState { gateway: self }))
             .layer(middleware)
     }
@@ -95,6 +99,34 @@ async fn webhook_wecom(
     request: Request<Body>,
 ) -> Response {
     handle_webhook(&state.gateway, "wecom", request).await
+}
+
+async fn webhook_dingtalk(
+    State(state): axum::extract::State<Arc<GatewayState>>,
+    request: Request<Body>,
+) -> Response {
+    handle_webhook(&state.gateway, "dingtalk", request).await
+}
+
+async fn webhook_feishu(
+    State(state): axum::extract::State<Arc<GatewayState>>,
+    request: Request<Body>,
+) -> Response {
+    handle_webhook(&state.gateway, "feishu", request).await
+}
+
+async fn webhook_weixin(
+    State(state): axum::extract::State<Arc<GatewayState>>,
+    request: Request<Body>,
+) -> Response {
+    handle_webhook(&state.gateway, "weixin", request).await
+}
+
+async fn webhook_sms(
+    State(state): axum::extract::State<Arc<GatewayState>>,
+    request: Request<Body>,
+) -> Response {
+    handle_webhook(&state.gateway, "sms", request).await
 }
 
 async fn handle_webhook(

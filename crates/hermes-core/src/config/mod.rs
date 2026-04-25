@@ -37,6 +37,19 @@
 //! | `HERMES_ANTHROPIC_API_KEY` | credentials.anthropic |
 //! | `HERMES_TELEGRAM_BOT_TOKEN` | gateway.platforms.telegram.bot_token |
 //! | `HERMES_TELEGRAM_VERIFY_TOKEN` | gateway.platforms.telegram.verify_token |
+//! | `HERMES_DINGTALK_APP_KEY` | gateway.platforms.dingtalk.app_key |
+//! | `HERMES_DINGTALK_APP_SECRET` | gateway.platforms.dingtalk.app_secret |
+//! | `HERMES_FEISHU_APP_ID` | gateway.platforms.feishu.feishu_app_id |
+//! | `HERMES_FEISHU_APP_SECRET` | gateway.platforms.feishu.feishu_app_secret |
+//! | `HERMES_FEISHU_VERIFICATION_TOKEN` | gateway.platforms.feishu.verification_token |
+//! | `HERMES_FEISHU_ENCRYPT_KEY` | gateway.platforms.feishu.encrypt_key |
+//! | `HERMES_WEIXIN_APP_ID` | gateway.platforms.weixin.wx_app_id |
+//! | `HERMES_WEIXIN_APP_SECRET` | gateway.platforms.weixin.wx_app_secret |
+//! | `HERMES_WEIXIN_TOKEN` | gateway.platforms.weixin.wx_token |
+//! | `HERMES_WEIXIN_AES_KEY` | gateway.platforms.weixin.wx_aes_key |
+//! | `HERMES_TWILIO_ACCOUNT_SID` | gateway.platforms.sms.twilio_account_sid |
+//! | `HERMES_TWILIO_AUTH_TOKEN` | gateway.platforms.sms.twilio_auth_token |
+//! | `HERMES_TWILIO_FROM_NUMBER` | gateway.platforms.sms.twilio_from_number |
 //!
 //! ## 与其他模块的关系
 //! - 配置通过 `lib.rs` 被整个 crate 使用
@@ -176,12 +189,31 @@ pub fn config_file() -> PathBuf {
 /// 消息平台的配置结构
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PlatformConfig {
+    // Telegram
     pub bot_token: Option<String>,    // Telegram bot token
     pub verify_token: Option<String>, // Telegram webhook 验证 token
+    // WeCom
     pub corp_id: Option<String>,      // WeCom 企业 ID
     pub agent_id: Option<String>,     // WeCom 应用 agent ID
     pub token: Option<String>,        // WeCom token
     pub aes_key: Option<String>,      // WeCom AES 密钥
+    // DingTalk
+    pub app_key: Option<String>,      // DingTalk app key
+    pub app_secret: Option<String>,   // DingTalk app secret
+    // Feishu
+    pub feishu_app_id: Option<String>,       // Feishu app ID
+    pub feishu_app_secret: Option<String>,   // Feishu app secret
+    pub verification_token: Option<String>, // Feishu verification token
+    pub encrypt_key: Option<String>,  // Feishu encrypt key
+    // Weixin
+    pub wx_app_id: Option<String>,    // Weixin app ID
+    pub wx_app_secret: Option<String>, // Weixin app secret
+    pub wx_token: Option<String>,     // Weixin token
+    pub wx_aes_key: Option<String>,   // Weixin AES key
+    // SMS (Twilio)
+    pub twilio_account_sid: Option<String>, // Twilio account SID
+    pub twilio_auth_token: Option<String>,  // Twilio auth token
+    pub twilio_from_number: Option<String>,  // Twilio from number
 }
 
 /// 网关配置
@@ -409,6 +441,127 @@ impl Config {
                 .or_default();
             if let Some(p) = self.gateway.platforms.get_mut("telegram") {
                 p.verify_token = Some(val);
+            }
+        }
+        // DingTalk
+        if let Ok(val) = std::env::var("HERMES_DINGTALK_APP_KEY") {
+            self.gateway
+                .platforms
+                .entry("dingtalk".to_string())
+                .or_default();
+            if let Some(p) = self.gateway.platforms.get_mut("dingtalk") {
+                p.app_key = Some(val);
+            }
+        }
+        if let Ok(val) = std::env::var("HERMES_DINGTALK_APP_SECRET") {
+            self.gateway
+                .platforms
+                .entry("dingtalk".to_string())
+                .or_default();
+            if let Some(p) = self.gateway.platforms.get_mut("dingtalk") {
+                p.app_secret = Some(val);
+            }
+        }
+        // Feishu
+        if let Ok(val) = std::env::var("HERMES_FEISHU_APP_ID") {
+            self.gateway
+                .platforms
+                .entry("feishu".to_string())
+                .or_default();
+            if let Some(p) = self.gateway.platforms.get_mut("feishu") {
+                p.feishu_app_id = Some(val);
+            }
+        }
+        if let Ok(val) = std::env::var("HERMES_FEISHU_APP_SECRET") {
+            self.gateway
+                .platforms
+                .entry("feishu".to_string())
+                .or_default();
+            if let Some(p) = self.gateway.platforms.get_mut("feishu") {
+                p.feishu_app_secret = Some(val);
+            }
+        }
+        if let Ok(val) = std::env::var("HERMES_FEISHU_VERIFICATION_TOKEN") {
+            self.gateway
+                .platforms
+                .entry("feishu".to_string())
+                .or_default();
+            if let Some(p) = self.gateway.platforms.get_mut("feishu") {
+                p.verification_token = Some(val);
+            }
+        }
+        if let Ok(val) = std::env::var("HERMES_FEISHU_ENCRYPT_KEY") {
+            self.gateway
+                .platforms
+                .entry("feishu".to_string())
+                .or_default();
+            if let Some(p) = self.gateway.platforms.get_mut("feishu") {
+                p.encrypt_key = Some(val);
+            }
+        }
+        // Weixin
+        if let Ok(val) = std::env::var("HERMES_WEIXIN_APP_ID") {
+            self.gateway
+                .platforms
+                .entry("weixin".to_string())
+                .or_default();
+            if let Some(p) = self.gateway.platforms.get_mut("weixin") {
+                p.wx_app_id = Some(val);
+            }
+        }
+        if let Ok(val) = std::env::var("HERMES_WEIXIN_APP_SECRET") {
+            self.gateway
+                .platforms
+                .entry("weixin".to_string())
+                .or_default();
+            if let Some(p) = self.gateway.platforms.get_mut("weixin") {
+                p.wx_app_secret = Some(val);
+            }
+        }
+        if let Ok(val) = std::env::var("HERMES_WEIXIN_TOKEN") {
+            self.gateway
+                .platforms
+                .entry("weixin".to_string())
+                .or_default();
+            if let Some(p) = self.gateway.platforms.get_mut("weixin") {
+                p.wx_token = Some(val);
+            }
+        }
+        if let Ok(val) = std::env::var("HERMES_WEIXIN_AES_KEY") {
+            self.gateway
+                .platforms
+                .entry("weixin".to_string())
+                .or_default();
+            if let Some(p) = self.gateway.platforms.get_mut("weixin") {
+                p.wx_aes_key = Some(val);
+            }
+        }
+        // SMS (Twilio)
+        if let Ok(val) = std::env::var("HERMES_TWILIO_ACCOUNT_SID") {
+            self.gateway
+                .platforms
+                .entry("sms".to_string())
+                .or_default();
+            if let Some(p) = self.gateway.platforms.get_mut("sms") {
+                p.twilio_account_sid = Some(val);
+            }
+        }
+        if let Ok(val) = std::env::var("HERMES_TWILIO_AUTH_TOKEN") {
+            self.gateway
+                .platforms
+                .entry("sms".to_string())
+                .or_default();
+            if let Some(p) = self.gateway.platforms.get_mut("sms") {
+                p.twilio_auth_token = Some(val);
+            }
+        }
+        if let Ok(val) = std::env::var("HERMES_TWILIO_FROM_NUMBER") {
+            self.gateway
+                .platforms
+                .entry("sms".to_string())
+                .or_default();
+            if let Some(p) = self.gateway.platforms.get_mut("sms") {
+                p.twilio_from_number = Some(val);
             }
         }
         if let Ok(val) = std::env::var("HERMES_NUDGE_MEMORY_INTERVAL") {

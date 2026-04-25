@@ -1218,6 +1218,12 @@ dependencies = [
  "chrono",
  "hermes-core",
  "hermes-memory",
+ "hermes-platform-dingtalk",
+ "hermes-platform-feishu",
+ "hermes-platform-sms",
+ "hermes-platform-telegram",
+ "hermes-platform-wecom",
+ "hermes-platform-weixin",
  "parking_lot",
  "reqwest",
  "serde",
@@ -1362,6 +1368,27 @@ dependencies = [
  "tracing",
  "url",
  "urlencoding",
+]
+
+[[package]]
+name = "hermes-platform-sms"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64",
+ "chrono",
+ "hermes-core",
+ "hmac",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "sha1",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-test",
+ "tracing",
 ]
 
 [[package]]

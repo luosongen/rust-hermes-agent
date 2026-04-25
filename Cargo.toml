@@ -48,6 +48,8 @@ hermes-platform-telegram = { path = "crates/hermes-platform-telegram" }
 hermes-platform-wecom = { path = "crates/hermes-platform-wecom" }
 hermes-platform-feishu = { path = "crates/hermes-platform-feishu" }
 hermes-platform-weixin = { path = "crates/hermes-platform-weixin" }
+hermes-platform-dingtalk = { path = "crates/hermes-platform-dingtalk" }
+hermes-platform-sms = { path = "crates/hermes-platform-sms" }
 hermes-environment = { path = "crates/hermes-environment" }
 hermes-provider = { path = "crates/hermes-provider" }
 hermes-cron = { path = "crates/hermes-cron" }
@@ -66,3 +68,4 @@ tower-http = { version = "0.6", features = ["trace"] }
 scraper = "0.21"
 cron = "0.15"
 urlencoding = "2.1"
+serde_urlencoded = "0.7"

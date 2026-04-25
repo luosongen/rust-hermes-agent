@@ -31,8 +31,47 @@ pub async fn gateway_status() -> Result<()> {
             if platform.corp_id.is_some() {
                 println!("      - corp_id: configured");
             }
+            if platform.agent_id.is_some() {
+                println!("      - agent_id: configured");
+            }
             if platform.token.is_some() {
                 println!("      - token: configured");
+            }
+            if platform.aes_key.is_some() {
+                println!("      - aes_key: configured");
+            }
+            if platform.app_key.is_some() {
+                println!("      - app_key: configured");
+            }
+            if platform.app_secret.is_some() {
+                println!("      - app_secret: configured");
+            }
+            if platform.feishu_app_id.is_some() {
+                println!("      - feishu_app_id: configured");
+            }
+            if platform.feishu_app_secret.is_some() {
+                println!("      - feishu_app_secret: configured");
+            }
+            if platform.verification_token.is_some() {
+                println!("      - verification_token: configured");
+            }
+            if platform.encrypt_key.is_some() {
+                println!("      - encrypt_key: configured");
+            }
+            if platform.wx_app_id.is_some() {
+                println!("      - wx_app_id: configured");
+            }
+            if platform.wx_app_secret.is_some() {
+                println!("      - wx_app_secret: configured");
+            }
+            if platform.twilio_account_sid.is_some() {
+                println!("      - twilio_account_sid: configured");
+            }
+            if platform.twilio_auth_token.is_some() {
+                println!("      - twilio_auth_token: configured");
+            }
+            if platform.twilio_from_number.is_some() {
+                println!("      - twilio_from_number: configured");
             }
         }
     }
@@ -121,8 +160,32 @@ pub fn setup_gateway() -> Result<()> {
     println!("   token = \"your-token\"");
     println!("   aes_key = \"your-aes-key\"");
     println!();
-    println!("2. Set the OpenAI API key:");
+    println!("   [[gateway.platforms.dingtalk]]");
+    println!("   app_key = \"your-app-key\"");
+    println!("   app_secret = \"your-app-secret\"");
+    println!();
+    println!("   [[gateway.platforms.feishu]]");
+    println!("   feishu_app_id = \"your-app-id\"");
+    println!("   feishu_app_secret = \"your-app-secret\"");
+    println!("   verification_token = \"your-verification-token\"");
+    println!("   encrypt_key = \"your-encrypt-key\"");
+    println!();
+    println!("   [[gateway.platforms.weixin]]");
+    println!("   wx_app_id = \"your-app-id\"");
+    println!("   wx_app_secret = \"your-app-secret\"");
+    println!("   wx_token = \"your-token\"");
+    println!("   wx_aes_key = \"your-aes-key\"");
+    println!();
+    println!("   [[gateway.platforms.sms]]");
+    println!("   twilio_account_sid = \"your-account-sid\"");
+    println!("   twilio_auth_token = \"your-auth-token\"");
+    println!("   twilio_from_number = \"+1234567890\"");
+    println!();
+    println!("2. Or use environment variables:");
     println!("   export HERMES_OPENAI_API_KEY=\"your-api-key\"");
+    println!("   export HERMES_DINGTALK_APP_KEY=\"your-app-key\"");
+    println!("   export HERMES_FEISHU_APP_ID=\"your-app-id\"");
+    println!("   export HERMES_TWILIO_ACCOUNT_SID=\"your-account-sid\"");
     println!();
     println!("3. Start the gateway:");
     println!("   hermes gateway start");
