@@ -4,18 +4,30 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum EmailError {
-    #[error("SMTP error: {0}")]
-    Smtp(String),
-    
-    #[error("IMAP error: {0}")]
-    Imap(String),
-    
-    #[error("Webhook verification failed")]
-    VerificationFailed,
-    
+    #[error("SMTP connection error: {0}")]
+    SmtpConnection(String),
+
+    #[error("SMTP authentication error: {0}")]
+    SmtpAuth(String),
+
+    #[error("IMAP connection error: {0}")]
+    ImapConnection(String),
+
+    #[error("IMAP authentication error: {0}")]
+    ImapAuth(String),
+
     #[error("Parse error: {0}")]
-    Parse(String),
-    
-    #[error("Configuration error: {0}")]
-    Config(String),
+    ParseError(String),
+
+    #[error("Webhook signature verification failed")]
+    WebhookVerificationFailed,
+
+    #[error("Not authenticated")]
+    NotAuthenticated,
+
+    #[error("Network error: {0}")]
+    Network(String),
+
+    #[error("Send error: {0}")]
+    Send(String),
 }

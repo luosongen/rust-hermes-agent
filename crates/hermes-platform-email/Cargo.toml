@@ -22,7 +22,12 @@ serde_urlencoded = { workspace = true }
 async-imap = "0.10"
 mail-parser = "0.4"
 lettre = { version = "0.11", features = ["tokio1-native-tls", "tokio1", "smtp-transport", "builder"] }
+native-tls = "0.2"
+async-native-tls = "0.3"
 hermes-core = { workspace = true }
+hex = "0.4"
+openssl = "0.10"
+uuid = { workspace = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
