@@ -51,7 +51,7 @@ pub mod approval_tools;
 pub mod browser_tools;
 
 pub use file_tools::{ReadFileTool, WriteFileTool};
-pub use skills::{load_skill_registry, SkillExecuteTool, SkillListTool, SkillSearchTool};
+pub use skills::{load_skill_registry, load_skill_registry_and_manager, SkillExecuteTool, SkillListTool, SkillSearchTool, SkillManageTool};
 pub use terminal_tools::TerminalTool;
 pub use todo_tools::{TodoStore, TodoTool};
 pub use clarify_tools::ClarifyTool;
@@ -67,7 +67,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use hermes_environment::Environment;
+use hermes_skills::manager::SkillManager;
 use hermes_tool_registry::ToolRegistry;
+use parking_lot::RwLock;
 
 /// 将所有内置工具注册到传入的 ToolRegistry
 ///
@@ -102,4 +104,9 @@ pub fn register_builtin_tools(registry: &ToolRegistry, environment: Arc<dyn Envi
     registry.register(BrowserPressTool::new(browser_core.clone()));
     registry.register(BrowserVisionTool::new(browser_core.clone()));
     browser_core.start_cleanup();
+}
+
+/// 注册技能管理工具
+pub fn register_skill_tools(registry: &ToolRegistry, manager: Arc<RwLock<SkillManager>>) {
+    registry.register(SkillManageTool::new(manager));
 }
