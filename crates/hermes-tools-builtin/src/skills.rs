@@ -28,20 +28,25 @@
 
 use async_trait::async_trait;
 use hermes_core::{ToolContext, ToolError};
-use hermes_skills::{SkillLoader, SkillRegistry};
+use hermes_skills::{SkillExecutor, SkillLoader, SkillRegistry};
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Built-in skill execution tool.
-///
-/// Usage from agent: `skill_execute(name="skill-name")`
+/// Built-in skill execution tool with step-by-step execution support.
 pub struct SkillExecuteTool {
     registry: Arc<RwLock<SkillRegistry>>,
+    executor: Arc<SkillExecutor>,
+    executions: Arc<RwLock<HashMap<String, hermes_skills::SkillExecution>>>,
 }
 
 impl SkillExecuteTool {
-    pub fn new(registry: Arc<RwLock<SkillRegistry>>) -> Self {
-        Self { registry }
+    pub fn new(registry: Arc<RwLock<SkillRegistry>>, executor: Arc<SkillExecutor>) -> Self {
+        Self {
+            registry,
+            executor,
+            executions: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 }
 
@@ -52,7 +57,7 @@ impl hermes_tool_registry::Tool for SkillExecuteTool {
     }
 
     fn description(&self) -> &str {
-        "Execute a registered Hermes skill by name, returning its content"
+        "Execute a registered Hermes skill by name with step-by-step execution support"
     }
 
     fn parameters(&self) -> serde_json::Value {
@@ -62,28 +67,93 @@ impl hermes_tool_registry::Tool for SkillExecuteTool {
                 "name": {
                     "type": "string",
                     "description": "Name of the skill to execute"
+                },
+                "action": {
+                    "type": "string",
+                    "enum": ["start", "continue", "complete", "status"],
+                    "description": "Action: start (begin execution), continue (get current step), complete (finish step), status (show progress)"
                 }
             },
-            "required": ["name"]
+            "required": ["name", "action"]
         })
     }
 
     async fn execute(
         &self,
         args: serde_json::Value,
-        _context: ToolContext,
+        context: ToolContext,
     ) -> Result<String, ToolError> {
-        let name = args
-            .pointer("/name")
+        let name = args.pointer("/name")
             .and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::InvalidArgs("missing 'name' argument".into()))?;
 
-        let registry = self.registry.read();
-        let skill = registry
-            .get(name)
-            .ok_or_else(|| ToolError::NotFound(format!("skill not found: {}", name)))?;
+        let action = args.pointer("/action")
+            .and_then(|v| v.as_str())
+            .unwrap_or("start");
 
-        Ok(skill.content.clone())
+        let session_id = context.session_id;
+
+        match action {
+            "start" => {
+                let execution = self.executor.start(name)
+                    .map_err(|e| ToolError::Execution(e.to_string()))?;
+
+                let step_content = self.executor.get_current_step(&execution)
+                    .ok_or_else(|| ToolError::Execution("No steps found".into()))?;
+
+                self.executions.write().insert(session_id.clone(), execution);
+
+                Ok(format!(
+                    "Started skill '{}'.\n\n{}\n\nRemaining:\n{}",
+                    name,
+                    step_content,
+                    self.executor.get_remaining_steps(self.executions.read().get(&session_id).unwrap())
+                ))
+            }
+            "continue" => {
+                let mut executions = self.executions.write();
+                let execution = executions.get_mut(&session_id)
+                    .ok_or_else(|| ToolError::Execution("No active execution".into()))?;
+
+                let step_content = self.executor.get_current_step(execution)
+                    .ok_or_else(|| ToolError::Execution("No more steps".into()))?;
+
+                Ok(format!(
+                    "{}\n\nRemaining:\n{}",
+                    step_content,
+                    self.executor.get_remaining_steps(execution)
+                ))
+            }
+            "complete" => {
+                let mut executions = self.executions.write();
+                let execution = executions.get_mut(&session_id)
+                    .ok_or_else(|| ToolError::Execution("No active execution".into()))?;
+
+                self.executor.complete_step(execution);
+
+                if execution.is_complete() {
+                    let summary = self.executor.get_progress_summary(execution);
+                    executions.remove(&session_id);
+                    Ok(format!("✅ {}", summary))
+                } else {
+                    let step_content = self.executor.get_current_step(execution)
+                        .unwrap_or_else(|| "All steps completed!".to_string());
+                    Ok(format!("{}\n\nNext:\n{}\n\nRemaining:\n{}",
+                        self.executor.get_progress_summary(execution),
+                        step_content,
+                        self.executor.get_remaining_steps(execution)))
+                }
+            }
+            "status" => {
+                let executions = self.executions.read();
+                if let Some(execution) = executions.get(&session_id) {
+                    Ok(self.executor.get_progress_summary(execution))
+                } else {
+                    Ok("No active skill execution".to_string())
+                }
+            }
+            _ => Err(ToolError::InvalidArgs(format!("Unknown action: {}", action)))
+        }
     }
 }
 
@@ -349,7 +419,7 @@ impl hermes_tool_registry::Tool for SkillManageTool {
 }
 
 /// Initialize skill registry and skill manager by loading skills from default directories.
-pub fn load_skill_registry_and_manager() -> (Arc<RwLock<SkillRegistry>>, Arc<RwLock<SkillManager>>) {
+pub fn load_skill_registry_and_manager() -> (Arc<RwLock<SkillRegistry>>, Arc<RwLock<SkillManager>>, Arc<SkillExecutor>) {
     let loader = SkillLoader::new(SkillLoader::default_dirs());
     let skills = loader.load_all().unwrap_or_default();
     let registry = Arc::new(RwLock::new(SkillRegistry::new()));
@@ -366,5 +436,8 @@ pub fn load_skill_registry_and_manager() -> (Arc<RwLock<SkillRegistry>>, Arc<RwL
     });
     let manager = Arc::new(RwLock::new(manager));
 
-    (registry, manager)
+    let executor = SkillExecutor::from_default_dirs()
+        .unwrap_or_else(|_| SkillExecutor::new(Arc::clone(&registry)));
+
+    (registry, manager, Arc::new(executor))
 }
