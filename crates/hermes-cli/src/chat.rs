@@ -26,7 +26,7 @@
 use anyhow::Result;
 use hermes_core::{
     Agent, AgentConfig, ConversationRequest, DisplayHandler, InMemoryInsightsTracker,
-    InsightsTracker, LlmProvider, RateLimitTracker, RetryingProvider, RetryConfig, TitleGenerator,
+    InsightsTracker, LlmProvider, PoolStrategy, RateLimitTracker, RetryingProvider, RetryConfig, TitleGenerator,
     TrajectorySaver,
 };
 use crate::display::CliDisplay;
@@ -103,11 +103,11 @@ pub async fn run_chat(
     // 构建 LLM Provider
     let provider: Arc<dyn LlmProvider> = if let Some(creds) = credentials {
         // 使用凭据字符串创建凭据池
-        let pool = hermes_core::CredentialPool::new();
+        let pool = hermes_core::CredentialPool::new(PoolStrategy::RoundRobin);
         for cred in creds.split(',') {
             let parts: Vec<&str> = cred.split(':').collect();
             if parts.len() == 2 {
-                pool.add(parts[0], parts[1].to_string());
+                pool.add(parts[0], parts[1], parts[1]);
             }
         }
         // 使用 RetryingProvider 包装，添加自动重试逻辑

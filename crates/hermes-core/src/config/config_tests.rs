@@ -11,7 +11,7 @@ mod tests {
         McpServersConfig, McpTransport, PersonalityConfig, PersonalityPreset, ProviderSettings,
         SSHBackend, SttConfig, SttProviderConfig,
     };
-    use crate::credentials::Secret;
+    use crate::credential_pool::Secret;
 
     // Provider tests
     #[test]
