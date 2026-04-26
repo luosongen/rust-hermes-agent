@@ -121,11 +121,22 @@ struct QwenResponseMessage {
 }
 
 /// Qwen Token 使用量统计
-#\[derive(Deserialize, Debug)\]\nstruct QwenUsage {
+#[derive(Deserialize)]
+struct QwenUsage {
     input_tokens: usize,
     output_tokens: usize,
     #[allow(dead_code)]
     total_tokens: usize,
+}
+
+impl std::fmt::Debug for QwenUsage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("QwenUsage")
+            .field("input_tokens", &self.input_tokens)
+            .field("output_tokens", &self.output_tokens)
+            .field("total_tokens", &self.total_tokens)
+            .finish()
+    }
 }
 
 // =============================================================================
