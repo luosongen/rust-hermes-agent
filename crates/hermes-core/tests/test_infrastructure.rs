@@ -3,7 +3,7 @@
 //! Tests credential_pool, error_classifier, and retry_utils modules.
 
 use hermes_core::{
-    AgentError, classify_api_error, classify_http_error, ClassifiedError, CredPool,
+    AgentError, classify_api_error, classify_http_error, ClassifiedError, CredentialPool,
     CredentialEntry, CredentialStatus, FailoverReason, jittered_backoff, PoolStrategy,
     ProviderError, RetryConfig, with_retry,
 };
@@ -20,7 +20,7 @@ mod tests {
     #[test]
     fn test_credential_pool_round_robin() {
         // Test that RoundRobin strategy selects credentials evenly (by use_count)
-        let pool = CredPool::new(PoolStrategy::RoundRobin);
+        let pool = CredentialPool::new(PoolStrategy::RoundRobin);
         pool.add("openai", "key1");
         pool.add("openai", "key2");
 
@@ -35,7 +35,7 @@ mod tests {
 
     #[test]
     fn test_credential_pool_mark_exhausted() {
-        let pool = CredPool::new(PoolStrategy::RoundRobin);
+        let pool = CredentialPool::new(PoolStrategy::RoundRobin);
         pool.add("openai", "key1");
         pool.add("openai", "key2");
 
@@ -57,7 +57,7 @@ mod tests {
 
     #[test]
     fn test_credential_pool_random_strategy() {
-        let pool = CredPool::new(PoolStrategy::Random);
+        let pool = CredentialPool::new(PoolStrategy::Random);
         pool.add("openai", "key1");
         pool.add("openai", "key2");
         pool.add("openai", "key3");
@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_credential_pool_fill_first_strategy() {
-        let pool = CredPool::new(PoolStrategy::FillFirst);
+        let pool = CredentialPool::new(PoolStrategy::FillFirst);
         pool.add("openai", "key1");
         pool.add("openai", "key2");
 
@@ -91,7 +91,7 @@ mod tests {
 
     #[test]
     fn test_credential_pool_least_used_strategy() {
-        let pool = CredPool::new(PoolStrategy::LeastUsed);
+        let pool = CredentialPool::new(PoolStrategy::LeastUsed);
         pool.add("openai", "key1");
         pool.add("openai", "key2");
 
@@ -110,7 +110,7 @@ mod tests {
 
     #[test]
     fn test_credential_pool_unknown_provider() {
-        let pool = CredPool::new(PoolStrategy::RoundRobin);
+        let pool = CredentialPool::new(PoolStrategy::RoundRobin);
         pool.add("openai", "key1");
 
         // No credentials for unknown provider
