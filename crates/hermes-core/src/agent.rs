@@ -83,6 +83,161 @@ pub struct Agent {
     context_compressor: Option<ContextCompressor>,
 }
 
+/// Agent 构建器，使用流式 builder 模式替代 11 参数的构造函数
+///
+/// # 示例
+/// ```ignore
+/// let agent = AgentBuilder::new()
+///     .provider(provider)
+///     .tools(tools)
+///     .session_store(store)
+///     .config(AgentConfig::default())
+///     .build();
+/// ```
+// 注意：由于 trait object 和某些类型不支持 Debug/Clone，这里手动实现 Debug 并省略 Clone
+pub struct AgentBuilder {
+    provider: Option<Arc<dyn LlmProvider>>,
+    tools: Option<Arc<dyn ToolDispatcher>>,
+    session_store: Option<Arc<dyn SessionStore>>,
+    config: Option<AgentConfig>,
+    nudge_config: NudgeConfig,
+    display_handler: Option<Arc<dyn DisplayHandler>>,
+    title_generator: Option<Arc<TitleGenerator>>,
+    trajectory_saver: Option<TrajectorySaver>,
+    insights_tracker: Option<Arc<dyn InsightsTracker>>,
+    rate_limit_tracker: Option<Arc<RateLimitTracker>>,
+    retry_config: RetryConfig,
+}
+
+impl Default for AgentBuilder {
+    fn default() -> Self {
+        Self {
+            provider: None,
+            tools: None,
+            session_store: None,
+            config: None,
+            nudge_config: NudgeConfig::default(),
+            display_handler: None,
+            title_generator: None,
+            trajectory_saver: None,
+            insights_tracker: None,
+            rate_limit_tracker: None,
+            retry_config: RetryConfig::default(),
+        }
+    }
+}
+
+impl std::fmt::Debug for AgentBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgentBuilder")
+            .field("provider", &self.provider.is_some())
+            .field("tools", &self.tools.is_some())
+            .field("session_store", &self.session_store.is_some())
+            .field("config", &self.config)
+            .field("nudge_config", &self.nudge_config)
+            .field("display_handler", &self.display_handler.is_some())
+            .field("title_generator", &self.title_generator.is_some())
+            .field("trajectory_saver", &self.trajectory_saver.is_some())
+            .field("insights_tracker", &self.insights_tracker.is_some())
+            .field("rate_limit_tracker", &self.rate_limit_tracker.is_some())
+            .field("retry_config", &self.retry_config)
+            .finish()
+    }
+}
+
+impl AgentBuilder {
+    /// 创建新的 AgentBuilder
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 设置 LLM provider（必需）
+    pub fn provider(mut self, provider: Arc<dyn LlmProvider>) -> Self {
+        self.provider = Some(provider);
+        self
+    }
+
+    /// 设置工具调度器（必需）
+    pub fn tools(mut self, tools: Arc<dyn ToolDispatcher>) -> Self {
+        self.tools = Some(tools);
+        self
+    }
+
+    /// 设置会话存储（必需）
+    pub fn session_store(mut self, session_store: Arc<dyn SessionStore>) -> Self {
+        self.session_store = Some(session_store);
+        self
+    }
+
+    /// 设置 Agent 配置（必需）
+    pub fn config(mut self, config: AgentConfig) -> Self {
+        self.config = Some(config);
+        self
+    }
+
+    /// 设置 Nudge 配置（可选，默认启用）
+    pub fn nudge_config(mut self, nudge_config: NudgeConfig) -> Self {
+        self.nudge_config = nudge_config;
+        self
+    }
+
+    /// 设置显示处理器（可选）
+    pub fn display_handler(mut self, display_handler: Option<Arc<dyn DisplayHandler>>) -> Self {
+        self.display_handler = display_handler;
+        self
+    }
+
+    /// 设置标题生成器（可选）
+    pub fn title_generator(mut self, title_generator: Option<Arc<TitleGenerator>>) -> Self {
+        self.title_generator = title_generator;
+        self
+    }
+
+    /// 设置轨迹保存器（可选）
+    pub fn trajectory_saver(mut self, trajectory_saver: Option<TrajectorySaver>) -> Self {
+        self.trajectory_saver = trajectory_saver;
+        self
+    }
+
+    /// 设置洞察追踪器（可选）
+    pub fn insights_tracker(mut self, insights_tracker: Option<Arc<dyn InsightsTracker>>) -> Self {
+        self.insights_tracker = insights_tracker;
+        self
+    }
+
+    /// 设置速率限制追踪器（可选）
+    pub fn rate_limit_tracker(mut self, rate_limit_tracker: Option<Arc<RateLimitTracker>>) -> Self {
+        self.rate_limit_tracker = rate_limit_tracker;
+        self
+    }
+
+    /// 设置重试配置（可选）
+    pub fn retry_config(mut self, retry_config: RetryConfig) -> Self {
+        self.retry_config = retry_config;
+        self
+    }
+
+    /// 构建 Agent 实例
+    ///
+    /// # Panics
+    /// 如果必需字段（provider, tools, session_store, config）未设置，则 panic
+    pub fn build(self) -> Agent {
+        Agent::new(
+            self.provider.expect("provider is required"),
+            self.tools.expect("tools is required"),
+            self.session_store.expect("session_store is required"),
+            self.config.expect("config is required"),
+            self.nudge_config,
+            self.display_handler,
+            self.title_generator,
+            self.trajectory_saver,
+            self.insights_tracker,
+            self.rate_limit_tracker,
+            self.retry_config,
+        )
+    }
+}
+
 impl Agent {
     /// Returns a reference to the LLM provider.
     pub fn provider(&self) -> Arc<dyn LlmProvider> {
