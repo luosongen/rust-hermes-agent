@@ -149,12 +149,16 @@ async fn test_dingtalk_adapter_parse() {
     assert_eq!(msg.platform, "dingtalk");
 }
 
-/// 测试 WeCom 适配器需要加密签名，单独测试会复杂
-/// WeCom 的 parse_inbound 需要 msg_signature 等参数，这个测试需要完整的加密环境
+/// 测试 WeCom 适配器解析
+/// 注意：WeCom 使用 AES-256-CBC 加密，需要完整的加密环境才能测试
+/// 此测试需要与真实 WeCom 服务器交互来验证加密格式
 #[ignore]
 #[tokio::test]
 async fn test_wecom_adapter_parse() {
-    // WeCom 使用 XML 格式 + AES 加密，测试需要完整的加密环境
-    // 实际使用中 WeCom webhook 会包含加密参数
-    todo!("WeCom requires AES encryption - needs full crypto setup")
+    // WeCom 使用 XML + AES-256-CBC 加密，完整测试需要：
+    // 1. 正确的 AES key（43位 Base64 编码）
+    // 2. 正确的消息格式：random(16) + msg_len(4) + content + PKCS7 padding
+    // 3. 正确的 CBC 加密流程
+    // 实际使用中，WeCom webhook 会包含服务器正确加密的消息
+    todo!("WeCom requires AES-256-CBC encryption - needs full crypto setup with WeCom server")
 }

@@ -30,3 +30,6 @@ hermes-platform-sms.workspace = true
 [dev-dependencies]
 axum.workspace = true
 tower.workspace = true
+aes.workspace = true
+base64.workspace = true
+sha1.workspace = true

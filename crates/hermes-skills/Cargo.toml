@@ -21,6 +21,7 @@ sha2.workspace = true
 chrono.workspace = true
 walkdir = "2.5"
 fuzzy-matcher = "0.3"
+tempfile = "3"
 clap = { version = "4.5", features = ["derive"] }
 async-recursion = "1.0"
 

@@ -512,6 +512,18 @@ impl SessionStore for SqliteSessionStore {
         .map_err(|e| StorageError::Query(e.to_string()))?;
         Ok(rows.into_iter().map(|r| r.into()).collect())
     }
+
+    async fn insert_compressed_segment(&self, segment: &CompressedSegment) -> Result<(), StorageError> {
+        SqliteSessionStore::insert_compressed_segment(self, segment).await
+    }
+
+    async fn mark_messages_compressed(&self, session_id: &str, start_id: i64, end_id: i64) -> Result<(), StorageError> {
+        SqliteSessionStore::mark_messages_compressed(self, session_id, start_id, end_id).await
+    }
+
+    async fn get_compressed_segments(&self, session_id: &str) -> Result<Vec<CompressedSegment>, StorageError> {
+        SqliteSessionStore::get_compressed_segments(self, session_id).await
+    }
 }
 
 impl SqliteSessionStore {
@@ -589,27 +601,34 @@ impl SqliteSessionStore {
         .await
         .map_err(|e| StorageError::Query(e.to_string()))?;
 
-        let segments = rows
+        let segments: Vec<CompressedSegment> = rows
             .into_iter()
             .map(|r| {
                 let vector: Vec<f32> = r.vector
                     .chunks_exact(4)
-                    .map(|chunk| f32::from_le_bytes(chunk.try_into().unwrap()))
-                    .collect();
+                    .map(|chunk| {
+                        let bytes: [u8; 4] = chunk.try_into()
+                            .map_err(|e| StorageError::Query(format!("Invalid f32 bytes: {}", e)))?;
+                        Ok(f32::from_le_bytes(bytes))
+                    })
+                    .collect::<Result<Vec<f32>, StorageError>>()
+                    .map_err(|e| StorageError::Query(format!("Invalid vector data: {}", e)))?;
 
-                CompressedSegment {
+                let created_at = chrono::DateTime::parse_from_rfc3339(&r.created_at)
+                    .map_err(|e| StorageError::Query(format!("Invalid date format: {}", e)))?
+                    .with_timezone(&chrono::Utc);
+
+                Ok(CompressedSegment {
                     id: r.id,
                     session_id: r.session_id,
                     start_message_id: r.start_message_id,
                     end_message_id: r.end_message_id,
                     summary: r.summary,
                     vector,
-                    created_at: chrono::DateTime::parse_from_rfc3339(&r.created_at)
-                        .unwrap()
-                        .with_timezone(&chrono::Utc),
-                }
+                    created_at,
+                })
             })
-            .collect();
+            .collect::<Result<Vec<CompressedSegment>, StorageError>>()?;
 
         Ok(segments)
     }

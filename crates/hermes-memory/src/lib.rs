@@ -27,6 +27,7 @@
 
 pub mod builtin;
 pub mod compressed;
+pub mod compression;
 pub mod compression_config;
 pub mod compression_error;
 pub mod session;

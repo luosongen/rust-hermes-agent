@@ -12,6 +12,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::compressed::CompressedSegment;
+
 /// 会话实体 — 存储会话的元数据和统计信息。
 ///
 /// 包含会话 ID、来源、用户 ID、使用的模型、系统提示词、时间戳、
@@ -112,4 +114,9 @@ pub trait SessionStore: Send + Sync {
     async fn update_session(&self, session: &Session) -> Result<(), StorageError>;
     async fn get_session_stats(&self, session_id: &str) -> Result<Option<(usize, usize, usize)>, StorageError>;
     async fn search_sessions_by_model(&self, model: &str, limit: usize) -> Result<Vec<Session>, StorageError>;
+
+    // Compression support
+    async fn insert_compressed_segment(&self, segment: &CompressedSegment) -> Result<(), StorageError>;
+    async fn mark_messages_compressed(&self, session_id: &str, start_id: i64, end_id: i64) -> Result<(), StorageError>;
+    async fn get_compressed_segments(&self, session_id: &str) -> Result<Vec<CompressedSegment>, StorageError>;
 }

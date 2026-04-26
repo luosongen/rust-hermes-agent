@@ -50,6 +50,7 @@ hermes-platform-feishu = { path = "crates/hermes-platform-feishu" }
 hermes-platform-weixin = { path = "crates/hermes-platform-weixin" }
 hermes-platform-dingtalk = { path = "crates/hermes-platform-dingtalk" }
 hermes-platform-sms = { path = "crates/hermes-platform-sms" }
+hermes-platform-email = { path = "crates/hermes-platform-email" }
 hermes-environment = { path = "crates/hermes-environment" }
 hermes-provider = { path = "crates/hermes-provider" }
 hermes-cron = { path = "crates/hermes-cron" }

@@ -29,6 +29,7 @@ pub mod metadata;
 pub mod registry;
 pub mod security;
 pub mod tools;
+pub mod manager;
 
 #[cfg(test)]
 mod tests;
@@ -43,3 +44,4 @@ pub use hub::{MarketClient, Installer, Sync, Browse};
 pub use hub::{SecurityScanner, Severity, ThreatType};
 pub use hub_cli::{HubCli, HubCommand, run_hub_command};
 pub use tools::{skills_list, skills_view, skills_manage, SkillListItem, SkillViewResult, SkillsListArgs, SkillsViewArgs, SkillsManageArgs};
+pub use manager::{SkillManager, CreateResult, EditResult, PatchResult, DeleteResult, WriteFileResult, RemoveFileResult};
