@@ -4,8 +4,7 @@
 
 use hermes_core::{
     AgentError, classify_api_error, classify_http_error, ClassifiedError, CredentialPool,
-    CredentialEntry, CredentialStatus, FailoverReason, jittered_backoff, PoolStrategy,
-    ProviderError, RetryConfig, with_retry,
+    FailoverReason, jittered_backoff, PoolStrategy, ProviderError, RetryConfig, with_retry,
 };
 use std::time::Duration;
 
@@ -21,52 +20,52 @@ mod tests {
     fn test_credential_pool_round_robin() {
         // Test that RoundRobin strategy selects credentials evenly (by use_count)
         let pool = CredentialPool::new(PoolStrategy::RoundRobin);
-        pool.add("openai", "key1");
-        pool.add("openai", "key2");
+        pool.add("openai", "key1", "key1");
+        pool.add("openai", "key2", "key2");
 
-        // Select should return key1 first (use_count=0 for both, but min_by_key picks first)
-        let first = pool.select("openai").unwrap();
-        assert_eq!(first, "key1");
+        // get() should return (name, key) tuples
+        let first = pool.get("openai").unwrap();
+        assert_eq!(first, ("key1".to_string(), "key1".to_string()));
 
-        // Second select should return key2 since key1 now has higher use_count
-        let second = pool.select("openai").unwrap();
-        assert_eq!(second, "key2");
+        // Second get should return key2 since key1 now has higher use_count
+        let second = pool.get("openai").unwrap();
+        assert_eq!(second, ("key2".to_string(), "key2".to_string()));
     }
 
     #[test]
     fn test_credential_pool_mark_exhausted() {
         let pool = CredentialPool::new(PoolStrategy::RoundRobin);
-        pool.add("openai", "key1");
-        pool.add("openai", "key2");
+        pool.add("openai", "key1", "key1");
+        pool.add("openai", "key2", "key2");
 
-        // Select and mark first as exhausted
-        let first = pool.select("openai").unwrap();
-        assert_eq!(first, "key1");
+        // get and mark first as exhausted
+        let first = pool.get("openai").unwrap();
+        assert_eq!(first, ("key1".to_string(), "key1".to_string()));
         pool.mark_exhausted("openai", "key1");
 
-        // Next select should get key2 since key1 is exhausted
-        let second = pool.select("openai").unwrap();
-        assert_eq!(second, "key2");
+        // Next get should get key2 since key1 is exhausted
+        let second = pool.get("openai").unwrap();
+        assert_eq!(second, ("key2".to_string(), "key2".to_string()));
 
         // Mark key2 exhausted too
         pool.mark_exhausted("openai", "key2");
 
         // No credentials available
-        assert!(pool.select("openai").is_none());
+        assert!(pool.get("openai").is_none());
     }
 
     #[test]
     fn test_credential_pool_random_strategy() {
         let pool = CredentialPool::new(PoolStrategy::Random);
-        pool.add("openai", "key1");
-        pool.add("openai", "key2");
-        pool.add("openai", "key3");
+        pool.add("openai", "key1", "key1");
+        pool.add("openai", "key2", "key2");
+        pool.add("openai", "key3", "key3");
 
         // All three should be selectable
         let mut seen = std::collections::HashSet::new();
         for _ in 0..100 {
-            if let Some(key) = pool.select("openai") {
-                seen.insert(key);
+            if let Some((name, _)) = pool.get("openai") {
+                seen.insert(name);
             }
         }
 
@@ -79,42 +78,42 @@ mod tests {
     #[test]
     fn test_credential_pool_fill_first_strategy() {
         let pool = CredentialPool::new(PoolStrategy::FillFirst);
-        pool.add("openai", "key1");
-        pool.add("openai", "key2");
+        pool.add("openai", "key1", "key1");
+        pool.add("openai", "key2", "key2");
 
         // FillFirst always returns first available credential
         for _ in 0..10 {
-            let selected = pool.select("openai").unwrap();
-            assert_eq!(selected, "key1");
+            let selected = pool.get("openai").unwrap();
+            assert_eq!(selected, ("key1".to_string(), "key1".to_string()));
         }
     }
 
     #[test]
     fn test_credential_pool_least_used_strategy() {
         let pool = CredentialPool::new(PoolStrategy::LeastUsed);
-        pool.add("openai", "key1");
-        pool.add("openai", "key2");
+        pool.add("openai", "key1", "key1");
+        pool.add("openai", "key2", "key2");
 
-        // First select key1
-        let first = pool.select("openai").unwrap();
-        assert_eq!(first, "key1");
+        // First get should be key1
+        let first = pool.get("openai").unwrap();
+        assert_eq!(first, ("key1".to_string(), "key1".to_string()));
 
-        // Second select should pick key2 (lower use_count)
-        let second = pool.select("openai").unwrap();
-        assert_eq!(second, "key2");
+        // Second get should pick key2 (lower use_count)
+        let second = pool.get("openai").unwrap();
+        assert_eq!(second, ("key2".to_string(), "key2".to_string()));
 
-        // Third select should pick key1 again (lower use_count now)
-        let third = pool.select("openai").unwrap();
-        assert_eq!(third, "key1");
+        // Third get should pick key1 again (lower use_count now)
+        let third = pool.get("openai").unwrap();
+        assert_eq!(third, ("key1".to_string(), "key1".to_string()));
     }
 
     #[test]
     fn test_credential_pool_unknown_provider() {
         let pool = CredentialPool::new(PoolStrategy::RoundRobin);
-        pool.add("openai", "key1");
+        pool.add("openai", "key1", "key1");
 
         // No credentials for unknown provider
-        assert!(pool.select("unknown").is_none());
+        assert!(pool.get("unknown").is_none());
     }
 
     // =============================================================================
