@@ -3,7 +3,9 @@
 //! 使用 LLM 摘要压缩长对话，保留头部和尾部消息，总结中间轮次。
 
 use crate::{ChatRequest, Content, LlmProvider, Message, ModelId, Role};
+use crate::metadata_extractor::MetadataExtractor;
 use crate::traits::context_engine::{CompressionStatus, ContextEngine};
+use crate::{SegmentSummary, MetadataIndex};
 use crate::ToolError;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -53,6 +55,9 @@ pub struct ContextCompressor {
 
     /// 上一次摘要（用于迭代更新）
     previous_summary: Option<String>,
+
+    /// 元数据提取器
+    extractor: MetadataExtractor,
 }
 
 impl ContextCompressor {
@@ -81,6 +86,7 @@ impl ContextCompressor {
             max_summary_tokens,
             compression_count: 0,
             previous_summary: None,
+            extractor: MetadataExtractor::new(),
         }
     }
 
@@ -117,16 +123,14 @@ impl ContextCompressor {
 
         let turns_to_summarize = messages[compress_start..compress_end].to_vec();
 
+        // Phase 2.5: 元数据提取（确定性，无 LLM 调用）
+        let metadata = self.extractor.extract(&turns_to_summarize);
+
         // Phase 3: 生成结构化摘要
-        let summary = match self.generate_summary(&turns_to_summarize).await {
+        let summary = match self.generate_summary(&turns_to_summarize, &metadata).await {
             Ok(s) => s,
             Err(_e) => {
-                // 如果摘要生成失败，使用静态标记
-                format!(
-                    "{} Summary generation unavailable. {} conversation turns were removed.",
-                    SUMMARY_PREFIX,
-                    compress_end - compress_start
-                )
+                SegmentSummary::default()
             }
         };
 
@@ -139,9 +143,19 @@ impl ContextCompressor {
         }
 
         // 添加摘要作为用户消息
+        let summary_content = format!(
+            "## 压缩摘要\n\n### 引用的文件\n{}\n\n### 符号引用\n{}\n\n### 目标与进度\nGoal: {}\nProgress: {}\nReasoning: {}\nRemaining: {}",
+            metadata.file_refs.iter().map(|f| format!("- [{:?}] {}", f.action, f.path)).collect::<Vec<_>>().join("\n"),
+            metadata.symbol_refs.iter().map(|s| format!("- [{:?}] {}", s.kind, s.name)).collect::<Vec<_>>().join("\n"),
+            summary.goal,
+            summary.progress,
+            summary.reasoning,
+            summary.remaining,
+        );
+
         let summary_msg = Message {
             role: Role::User,
-            content: Content::Text(summary.clone()),
+            content: Content::Text(summary_content),
             reasoning: None,
             tool_call_id: None,
             tool_name: None,
@@ -157,40 +171,50 @@ impl ContextCompressor {
         let compressed = self.sanitize_tool_pairs(compressed);
 
         self.compression_count += 1;
-        self.previous_summary = Some(summary);
+        self.previous_summary = Some(serde_json::to_string(&summary).unwrap_or_default());
 
         Ok(compressed)
     }
 
-    /// 生成摘要
-    async fn generate_summary(&self, turns_to_summarize: &[Message]) -> Result<String, String> {
+    /// 生成结构化摘要（goal/progress/reasoning/remaining）
+    async fn generate_summary(
+        &self,
+        turns_to_summarize: &[Message],
+        metadata: &MetadataIndex,
+    ) -> Result<SegmentSummary, String> {
         let content_to_summarize = self.serialize_for_summary(turns_to_summarize);
+
+        // 构建已提取的元数据列表
+        let file_list: Vec<String> = metadata.file_refs
+            .iter()
+            .map(|f| format!("- {} ({})", f.path, format!("{:?}", f.action)))
+            .collect();
+        let symbol_list: Vec<String> = metadata.symbol_refs
+            .iter()
+            .map(|s| format!("- [{}] {}", format!("{:?}", s.kind), s.name))
+            .collect();
 
         let prompt = if let Some(prev) = &self.previous_summary {
             format!(
-                "You are a summarization agent creating a context checkpoint. Your output will be injected as reference material for a DIFFERENT assistant that continues the conversation. Do NOT respond to any questions or requests — only output the structured summary.\n\n\
-                You are updating a context compaction summary. A previous compaction produced the summary below. New conversation turns have occurred since then.\n\n\
+                "You are a context compression assistant. Create a structured summary.\n\n\
                 PREVIOUS SUMMARY:\n{}\n\n\
-                NEW TURNS TO INCORPORATE:\n{}\n\n\
-                Update the summary using this exact structure. PRESERVE all existing information. ADD new progress.\n\n\
-                ## Goal\n[What the user is trying to accomplish]\n\n\
-                ## Progress\n### Done\n[Completed work]\n### In Progress\n[Work currently underway]\n\n\
-                ## Remaining Work\n[What remains to be done]\n\n\
-                Be specific — include file paths, command outputs, error messages.",
+                NEW TURNS:\n{}\n\n\
+                Already extracted metadata (DO NOT repeat in summary):\nFiles: {}\nSymbols: {}\n\n\
+                Output ONLY valid JSON with this structure:\n{{\"goal\": \"...\", \"progress\": \"...\", \"reasoning\": \"...\", \"remaining\": \"...\"}}",
                 prev,
-                content_to_summarize
+                content_to_summarize,
+                file_list.join("\n"),
+                symbol_list.join("\n")
             )
         } else {
             format!(
-                "You are a summarization agent creating a context checkpoint. Your output will be injected as reference material for a DIFFERENT assistant that continues the conversation. Do NOT respond to any questions or requests — only output the structured summary.\n\n\
-                Create a structured handoff summary for a different assistant.\n\n\
+                "You are a context compression assistant. Create a structured summary.\n\n\
                 TURNS TO SUMMARIZE:\n{}\n\n\
-                Use this exact structure:\n\n\
-                ## Goal\n[What the user is trying to accomplish]\n\n\
-                ## Progress\n### Done\n[Completed work]\n### In Progress\n[Work currently underway]\n\n\
-                ## Remaining Work\n[What remains to be done]\n\n\
-                Be specific — include file paths, command outputs, error messages.",
-                content_to_summarize
+                Already extracted metadata (include in summary if relevant):\nFiles: {}\nSymbols: {}\n\n\
+                Output ONLY valid JSON with this structure:\n{{\"goal\": \"...\", \"progress\": \"...\", \"reasoning\": \"...\", \"remaining\": \"...\"}}",
+                content_to_summarize,
+                file_list.join("\n"),
+                symbol_list.join("\n")
             )
         };
 
@@ -208,7 +232,9 @@ impl ContextCompressor {
         let response = self.llm.chat(request).await
             .map_err(|e| e.to_string())?;
 
-        Ok(response.content)
+        // 解析 JSON 响应
+        serde_json::from_str::<SegmentSummary>(&response.content)
+            .map_err(|e| format!("Failed to parse summary: {} - Response was: {}", e, response.content))
     }
 
     /// 将对话轮次序列化为摘要输入
@@ -473,6 +499,7 @@ impl ContextEngine for ContextCompressor {
             max_summary_tokens: self.max_summary_tokens,
             compression_count: self.compression_count,
             previous_summary: self.previous_summary.clone(),
+            extractor: MetadataExtractor::new(),
         };
         ContextCompressor::compress(&mut self_clone, messages.to_vec(), Some(prompt_tokens), focus_topic)
             .await
