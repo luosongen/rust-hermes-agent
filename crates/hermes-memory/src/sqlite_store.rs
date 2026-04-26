@@ -430,6 +430,13 @@ impl SessionStore for SqliteSessionStore {
     }
 
     async fn delete_session(&self, session_id: &str) -> Result<(), StorageError> {
+        // 先删除压缩段落（引用 messages 表的外键），再删除消息，最后删除会话
+        // Delete compressed segments first (they reference messages), then messages, then session
+        sqlx::query("DELETE FROM compressed_segments WHERE session_id = ?")
+            .bind(session_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| StorageError::Query(e.to_string()))?;
         sqlx::query("DELETE FROM messages WHERE session_id = ?")
             .bind(session_id)
             .execute(&self.pool)
