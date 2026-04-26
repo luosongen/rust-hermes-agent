@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use hermes_core::{ChatRequest, ChatResponse, ModelId, ProviderError};
 use serde::{Deserialize, Serialize};
+use futures_util::StreamExt;
 use reqwest::Client;
 
 // =============================================================================
@@ -119,6 +120,27 @@ struct AnthropicUsage {
     output_tokens: usize,
     cache_creation_tokens: Option<usize>,
     cache_read_tokens: Option<usize>,
+}
+
+/// Anthropic 流式事件
+#[derive(Debug, Deserialize)]
+struct AnthropicStreamEvent {
+    #[serde(rename = "type")]
+    event_type: String,
+    index: Option<usize>,
+    delta: Option<AnthropicStreamDelta>,
+    #[serde(rename = "stop_reason")]
+    stop_reason: Option<String>,
+}
+
+/// Anthropic 流式 Delta
+#[derive(Debug, Deserialize)]
+struct AnthropicStreamDelta {
+    #[serde(rename = "type")]
+    delta_type: String,
+    text: Option<String>,
+    #[serde(rename = "partial_json")]
+    partial_json: Option<String>,
 }
 
 // =============================================================================
@@ -323,10 +345,112 @@ impl crate::traits::LlmProvider for AnthropicProvider {
 
     async fn chat_streaming(
         &self,
-        _request: ChatRequest,
-        _callback: hermes_core::StreamingCallback,
+        request: ChatRequest,
+        callback: hermes_core::StreamingCallback,
     ) -> Result<ChatResponse, ProviderError> {
-        Err(ProviderError::Api("Streaming not yet implemented for Anthropic".into()))
+        let mut anthropic_request = self.convert_request(request);
+        anthropic_request.stream = true;
+
+        let mut full_content = String::new();
+        let mut full_tool_calls: Vec<hermes_core::ToolCall> = Vec::new();
+        let mut stop_reason = "end_turn".to_string();
+
+        let response = self
+            .client
+            .post("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .header("accept", "text/event-stream")
+            .json(&anthropic_request)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            if status.as_u16() == 401 {
+                return Err(ProviderError::Auth);
+            }
+            if status.as_u16() == 429 {
+                return Err(ProviderError::RateLimit(60));
+            }
+            return Err(ProviderError::Api(format!("HTTP {}: {}", status, body)));
+        }
+
+        let mut stream = response.bytes_stream();
+
+        while let Some(chunk) = stream.next().await {
+            let bytes = chunk.map_err(|e| ProviderError::Network(e))?;
+            let text = String::from_utf8_lossy(&bytes);
+
+            for line in text.lines() {
+                if line.starts_with("data: ") {
+                    let data = &line[6..];
+                    if let Ok(event) = serde_json::from_str::<AnthropicStreamEvent>(data) {
+                        match event.event_type.as_str() {
+                            "content_block_delta" => {
+                                if let Some(delta) = event.delta {
+                                    if delta.delta_type == "text_delta" {
+                                        if let Some(text) = delta.text {
+                                            full_content += &text;
+                                            callback(ChatResponse {
+                                                content: text.clone(),
+                                                finish_reason: hermes_core::FinishReason::Stop,
+                                                tool_calls: None,
+                                                reasoning: None,
+                                                usage: None,
+                                            });
+                                        }
+                                    } else if delta.delta_type == "input_json_delta" {
+                                        if let Some(json) = delta.partial_json {
+                                            let idx = event.index.unwrap_or(0);
+                                            if full_tool_calls.len() <= idx {
+                                                full_tool_calls.resize(idx + 1, hermes_core::ToolCall {
+                                                    id: format!("tool-{}", idx),
+                                                    name: String::new(),
+                                                    arguments: std::collections::HashMap::new(),
+                                                });
+                                            }
+                                            let args = &mut full_tool_calls[idx].arguments;
+                                            let current: String = args.iter()
+                                                .map(|(k,v)| format!("{}: {}", k, v))
+                                                .collect::<Vec<_>>()
+                                                .join(", ");
+                                            args.insert(format!("__partial_{}", idx), serde_json::Value::String(current + &json));
+                                        }
+                                    }
+                                }
+                            }
+                            "message_delta" => {
+                                if let Some(ref sr) = event.stop_reason {
+                                    stop_reason = sr.clone();
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+
+        let finish_reason = match stop_reason.as_str() {
+            "end_turn" => hermes_core::FinishReason::Stop,
+            "max_tokens" => hermes_core::FinishReason::Length,
+            _ => hermes_core::FinishReason::Other,
+        };
+
+        Ok(ChatResponse {
+            content: full_content,
+            finish_reason,
+            tool_calls: if full_tool_calls.is_empty() {
+                None
+            } else {
+                Some(full_tool_calls)
+            },
+            reasoning: None,
+            usage: None,
+        })
     }
 
     fn estimate_tokens(&self, text: &str, _model: &ModelId) -> usize {
