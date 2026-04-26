@@ -138,22 +138,30 @@ fn blocking_execute(
     }
 
     // Wait for process with timeout
+    // 使用轮询 + sleep 实现超时等待：先检查是否超时，再等待进程
     let start_wait = Instant::now();
-    let timeout_duration = Duration::from_millis(effective_timeout_ms);
+    let timeout_duration = std::time::Duration::from_millis(effective_timeout_ms);
+    let poll_interval = std::time::Duration::from_millis(50);
 
     let exit_code = loop {
-        match child.wait() {
-            Ok(status) => break status.code().unwrap_or(-1),
-            Err(e) => {
-                return Err(ToolError::Execution(format!("Process wait error: {}", e)));
-            }
-        }
+        // 首先检查是否已超时（避免长时间阻塞在 wait() 中）
         if start_wait.elapsed() > timeout_duration {
             let _ = child.kill();
             let _ = child.wait();
             return Err(ToolError::Timeout("Execution timed out".to_string()));
         }
-        std::thread::sleep(Duration::from_millis(10));
+
+        // 尝试获取进程状态（非阻塞检查）
+        match child.try_wait() {
+            Ok(Some(status)) => break status.code().unwrap_or(-1),
+            Ok(None) => {
+                // 进程尚未退出，休眠后重试
+                std::thread::sleep(poll_interval);
+            }
+            Err(e) => {
+                return Err(ToolError::Execution(format!("Process wait error: {}", e)));
+            }
+        }
     };
 
     // Convert output to strings with buffer limit

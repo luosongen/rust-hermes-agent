@@ -254,7 +254,7 @@ impl McpClientBridge {
             },
         };
 
-        let request = JsonRpcRequest::new(id, "initialize", Some(serde_json::to_value(params).unwrap()));
+        let request = JsonRpcRequest::new(id, "initialize", Some(serde_json::to_value(params).map_err(|e| ToolError::Execution(format!("Failed to serialize initialize params: {}", e)))?));
         self.send_request(request).await?;
 
         // Wait for response

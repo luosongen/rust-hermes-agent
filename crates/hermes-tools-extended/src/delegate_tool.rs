@@ -15,6 +15,7 @@ use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdin, Command};
 use tokio::sync::{Mutex, Semaphore};
+use tracing;
 
 const DEFAULT_MAX_CONCURRENT: usize = 3;
 
@@ -154,8 +155,10 @@ impl Tool for DelegateTool {
             }
         }
 
-        // 终止子进程
-        child.kill().await.ok();
+        // 终止子进程，如果失败则记录警告日志
+        if let Err(e) = child.kill().await {
+            tracing::warn!("Failed to kill delegate process: {}", e);
+        }
         let _ = child.wait().await;
 
         let duration = start.elapsed().as_secs_f64();
