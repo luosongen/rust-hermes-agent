@@ -3,9 +3,12 @@
 //! 提供技能逐步执行的能力，解析技能中的 checkbox 步骤并跟踪执行状态。
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;
+
+use crate::error::SkillError;
+use crate::loader::SkillLoader;
+use crate::registry::SkillRegistry;
 
 /// 技能执行状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,6 +94,120 @@ pub fn parse_steps(content: &str) -> Vec<Step> {
     }
 
     steps
+}
+
+/// 技能执行器
+pub struct SkillExecutor {
+    registry: Arc<RwLock<SkillRegistry>>,
+}
+
+impl SkillExecutor {
+    pub fn new(registry: Arc<RwLock<SkillRegistry>>) -> Self {
+        Self { registry }
+    }
+
+    /// 从默认目录加载技能并创建执行器
+    pub fn from_default_dirs() -> Result<Self, SkillError> {
+        let loader = SkillLoader::new(SkillLoader::default_dirs());
+        let skills = loader.load_all()?;
+        let registry = Arc::new(RwLock::new(SkillRegistry::new()));
+        for skill in skills {
+            registry.write().register(skill)
+                .map_err(|e| SkillError::LoadError(e.to_string()))?;
+        }
+        Ok(Self::new(registry))
+    }
+
+    /// 开始执行技能
+    pub fn start(&self, skill_name: &str) -> Result<SkillExecution, SkillError> {
+        let registry = self.registry.read();
+        let skill = registry.get(skill_name)
+            .ok_or_else(|| SkillError::NotFound(skill_name.to_string()))?;
+
+        let steps = parse_steps(&skill.content);
+        if steps.is_empty() {
+            return Err(SkillError::InvalidInput(
+                format!("Skill '{}' has no executable steps", skill_name)
+            ));
+        }
+
+        Ok(SkillExecution::new(skill_name.to_string(), steps))
+    }
+
+    /// 获取当前步骤内容
+    pub fn get_current_step(&self, execution: &SkillExecution) -> Option<String> {
+        execution.current_step().map(|step| {
+            format!("## {}\n- [ ] {}\n", step.task_name, step.content)
+        })
+    }
+
+    /// 标记当前步骤完成并移动到下一步
+    pub fn complete_step(&self, execution: &mut SkillExecution) {
+        let completed = (execution.current_task, execution.current_step);
+        if !execution.completed_steps.contains(&completed) {
+            execution.completed_steps.push(completed);
+        }
+
+        // 移动到下一步
+        let remaining: Vec<_> = execution.steps.iter()
+            .filter(|s| !execution.completed_steps.contains(&(s.task_idx, s.step_idx)))
+            .collect();
+
+        if let Some(next) = remaining.first() {
+            execution.current_task = next.task_idx;
+            execution.current_step = next.step_idx;
+        } else {
+            // 所有步骤完成
+            execution.current_task = execution.steps.len();
+            execution.current_step = 0;
+        }
+    }
+
+    /// 获取进度摘要
+    pub fn get_progress_summary(&self, execution: &SkillExecution) -> String {
+        let total = execution.steps.len();
+        let completed = execution.completed_steps.len();
+        let remaining = total - completed;
+
+        if remaining == 0 {
+            return format!("✅ Skill '{}' completed ({}/{} steps)", execution.skill_name, completed, total);
+        }
+
+        let current = execution.current_step()
+            .map(|s| format!("Current: {} - {}", s.task_name, s.content))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        format!(
+            "📋 {}: {}/{} steps completed, {} remaining\n{}",
+            execution.skill_name, completed, total, remaining, current
+        )
+    }
+
+    /// 获取所有剩余步骤
+    pub fn get_remaining_steps(&self, execution: &SkillExecution) -> String {
+        let remaining: Vec<_> = execution.steps.iter()
+            .filter(|s| !execution.completed_steps.contains(&(s.task_idx, s.step_idx)))
+            .collect();
+
+        if remaining.is_empty() {
+            return "All steps completed!".to_string();
+        }
+
+        let mut output = String::new();
+        let mut current_task = 0;
+        for step in remaining {
+            if step.task_idx != current_task {
+                if current_task != 0 {
+                    output.push('\n');
+                }
+                output.push_str(&format!("## {}\n", step.task_name));
+                current_task = step.task_idx;
+            }
+            output.push_str(&format!("- [ ] {}\n", step.content));
+        }
+
+        output
+    }
 }
 
 #[cfg(test)]

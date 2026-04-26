@@ -11,6 +11,7 @@
 //! - `InvalidPath`: 无效的技能文件路径
 //! - `Download`: 技能下载失败
 //! - `PlatformNotSupported`: 技能不支持当前平台
+//! - `LoadError`: 技能加载错误
 //!
 //! ## 使用方式
 //! 使用 `thiserror` 派生 `Error` trait，支持 `?` 运算符自动传播。
@@ -51,6 +52,9 @@ pub enum SkillError {
 
     #[error("Patch error: {0}")]
     Patch(String),
+
+    #[error("Load error: {0}")]
+    LoadError(String),
 }
 
 impl From<tempfile::PersistError> for SkillError {
