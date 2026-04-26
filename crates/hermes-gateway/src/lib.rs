@@ -41,14 +41,15 @@ use tower_http::trace::TraceLayer;
 /// The gateway application — holds adapters and agent reference.
 pub struct Gateway {
     adapters: RwLock<Vec<Arc<dyn PlatformAdapter>>>,
-    agent: Arc<Agent>,
+    agent: Arc<tokio::sync::RwLock<Agent>>,
 }
 
 impl Gateway {
     pub fn new(agent: Arc<Agent>) -> Self {
+        let agent = Arc::try_unwrap(agent).ok().expect("Gateway::new expects exclusive ownership of Agent");
         Self {
             adapters: RwLock::new(Vec::new()),
-            agent,
+            agent: Arc::new(tokio::sync::RwLock::new(agent)),
         }
     }
 
@@ -181,6 +182,8 @@ async fn handle_webhook(
 
     let response = gateway
         .agent
+        .write()
+        .await
         .run_conversation(ConversationRequest {
             content: inbound.content.clone(),
             session_id: Some(inbound.session_id.clone()),
