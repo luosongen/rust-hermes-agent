@@ -125,14 +125,30 @@ impl StreamingOutput {
         }
     }
 
-    /// 显示加载动画 (预留)
-    pub fn start_loading(&self, _message: &str) {
-        // TODO: 实现加载动画
+    /// 显示加载动画
+    pub fn start_loading(&self, message: &str) {
+        if !self.enabled.load(Ordering::SeqCst) {
+            self.enabled.store(true, Ordering::SeqCst);
+            let enabled = self.enabled.clone();
+            let msg = message.to_string();
+            tokio::spawn(async move {
+                let spinner = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏";
+                let mut i = 0;
+                while enabled.load(Ordering::SeqCst) {
+                    print!("\r{} {}{}\x1B[K", spinner.chars().nth(i % 10).unwrap_or(' '), msg, "...");
+                    std::io::stdout().flush().ok();
+                    tokio::time::sleep(tokio::time::Duration::from_millis(80)).await;
+                    i += 1;
+                }
+                print!("\r\x1B[K");
+                std::io::stdout().flush().ok();
+            });
+        }
     }
 
     /// 停止加载动画
     pub fn stop_loading(&self) {
-        // TODO: 实现加载动画停止
+        self.enabled.store(false, Ordering::SeqCst);
     }
 }
 
