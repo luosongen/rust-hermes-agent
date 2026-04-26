@@ -75,10 +75,20 @@ mod compression_tests {
 
     #[tokio::test]
     async fn test_compressed_segment_structure() {
+        use crate::compressed::{MetadataIndex, SegmentSummary};
+
+        let metadata = MetadataIndex::default();
+        let summary = SegmentSummary {
+            goal: "Test goal".to_string(),
+            progress: "Test progress".to_string(),
+            reasoning: "Test reasoning".to_string(),
+            remaining: "Test remaining".to_string(),
+        };
         let segment = CompressedSegment::new(
             "session1".into(),
             1, 10,
-            "Test summary".into(),
+            metadata,
+            summary,
             vec![0.1, 0.2, 0.3],
         );
 
