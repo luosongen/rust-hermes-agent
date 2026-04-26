@@ -1,8 +1,9 @@
 use async_trait::async_trait;
+use futures_util::StreamExt;
 use hermes_core::{ChatRequest, ChatResponse, ModelId, ProviderError};
 use serde::{Deserialize, Serialize};
-use reqwest::Client;
 use std::collections::HashMap;
+use reqwest::Client;
 
 // =============================================================================
 // Kimi (Moonshot AI) Provider 实现
@@ -40,8 +41,7 @@ use std::collections::HashMap;
 //
 // ## 流式输出
 //
-// [`chat_streaming`] 方法当前返回 `Err(ProviderError::Api("Streaming not yet implemented"))`，
-// 表示流式输出功能尚未实现。
+// [`chat_streaming`] 方法支持 SSE 流式输出，累积内容后通过回调逐段返回。
 
 // =============================================================================
 // 请求/响应类型定义
@@ -132,6 +132,49 @@ struct KimiToolCall {
 struct KimiFunctionCall {
     name: String,
     arguments: String,
+}
+
+// =============================================================================
+// 流式响应类型定义
+// =============================================================================
+
+/// Kimi 流式响应 Delta
+#[derive(Debug, Deserialize)]
+struct KimiStreamDelta {
+    choices: Vec<KimiStreamChoice>,
+}
+
+/// Kimi 流式响应 Choice
+#[derive(Debug, Deserialize)]
+struct KimiStreamChoice {
+    delta: KimiStreamContent,
+    finish_reason: Option<String>,
+}
+
+/// Kimi 流式响应 Content
+#[derive(Debug, Deserialize)]
+struct KimiStreamContent {
+    role: Option<String>,
+    content: Option<String>,
+    #[serde(default)]
+    tool_calls: Option<Vec<KimiStreamToolCall>>,
+}
+
+/// Kimi 流式工具调用
+#[derive(Debug, Deserialize)]
+struct KimiStreamToolCall {
+    index: usize,
+    id: Option<String>,
+    #[serde(rename = "type")]
+    call_type: Option<String>,
+    function: KimiStreamFunction,
+}
+
+/// Kimi 流式函数调用
+#[derive(Debug, Deserialize)]
+struct KimiStreamFunction {
+    name: Option<String>,
+    arguments: Option<String>,
 }
 
 // =============================================================================
@@ -251,10 +294,91 @@ impl hermes_core::LlmProvider for KimiProvider {
 
     async fn chat_streaming(
         &self,
-        _request: ChatRequest,
-        _callback: hermes_core::StreamingCallback,
+        request: ChatRequest,
+        callback: hermes_core::StreamingCallback,
     ) -> Result<ChatResponse, ProviderError> {
-        Err(ProviderError::Api("Streaming not yet implemented".into()))
+        let mut kimi_request = convert_request(request);
+        kimi_request.stream = true;
+
+        let mut full_content = String::new();
+        let mut full_tool_calls: Vec<hermes_core::ToolCall> = Vec::new();
+        let mut finish_reason = hermes_core::FinishReason::Stop;
+
+        let response = self
+            .client
+            .post("https://api.moonshot.cn/v1/chat/completions")
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream")
+            .json(&kimi_request)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(ProviderError::Api(format!("HTTP {}: {}", status, body)));
+        }
+
+        let mut stream = response.bytes_stream();
+
+        while let Some(chunk) = stream.next().await {
+            let bytes = chunk.map_err(|e| ProviderError::Network(e))?;
+            let text = String::from_utf8_lossy(&bytes);
+
+            for line in text.lines() {
+                if line.starts_with("data: ") {
+                    let data = &line[6..];
+                    if data == "[DONE]" {
+                        break;
+                    }
+                    if let Ok(delta) = serde_json::from_str::<KimiStreamDelta>(data) {
+                        if let Some(choice) = delta.choices.into_iter().next() {
+                            if let Some(content) = choice.delta.content {
+                                full_content += &content;
+                                callback(ChatResponse {
+                                    content: content.clone(),
+                                    finish_reason: hermes_core::FinishReason::Stop,
+                                    tool_calls: None,
+                                    reasoning: None,
+                                    usage: None,
+                                });
+                            }
+                            if let Some(tool_calls) = choice.delta.tool_calls {
+                                for tc in tool_calls {
+                                    if let (Some(id), Some(name), Some(args)) = (&tc.id, &tc.function.name, &tc.function.arguments) {
+                                        full_tool_calls.push(hermes_core::ToolCall {
+                                            id: id.clone(),
+                                            name: name.clone(),
+                                            arguments: serde_json::from_str(args).unwrap_or_default(),
+                                        });
+                                    }
+                                }
+                            }
+                            if let Some(ref fr) = choice.finish_reason {
+                                finish_reason = match fr.as_str() {
+                                    "stop" => hermes_core::FinishReason::Stop,
+                                    "length" => hermes_core::FinishReason::Length,
+                                    _ => hermes_core::FinishReason::Other,
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(ChatResponse {
+            content: full_content,
+            finish_reason,
+            tool_calls: if full_tool_calls.is_empty() {
+                None
+            } else {
+                Some(full_tool_calls)
+            },
+            reasoning: None,
+            usage: None,
+        })
     }
 
     fn estimate_tokens(&self, text: &str, _model: &ModelId) -> usize {
