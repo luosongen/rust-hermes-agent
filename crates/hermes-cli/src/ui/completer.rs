@@ -101,10 +101,19 @@ impl SlashCommandCompleter {
             .collect()
     }
 
-    /// 补全命令参数 (预留接口)
-    pub fn complete_args(&self, _command: &str, _partial: &str) -> Vec<String> {
-        // TODO: 根据命令类型提供参数补全
-        Vec::new()
+    /// 补全命令参数
+    pub fn complete_args(&self, command: &str, _partial: &str) -> Vec<String> {
+        match command.trim_start_matches('/').split_whitespace().next().unwrap_or("") {
+            "model" => vec![
+                "openai/gpt-4o".to_string(),
+                "openai/gpt-4o-mini".to_string(),
+                "anthropic/claude-3-5-sonnet-20241022".to_string(),
+            ],
+            "context" => vec!["compress".to_string(), "clear".to_string(), "status".to_string()],
+            "tokens" => vec!["status".to_string()],
+            "system" => vec!["prompt".to_string(), "role".to_string()],
+            _ => vec![],
+        }
     }
 
     /// 获取帮助文本
