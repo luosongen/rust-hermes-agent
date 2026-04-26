@@ -30,6 +30,7 @@ pub mod registry;
 pub mod security;
 pub mod tools;
 pub mod manager;
+pub mod executor;
 
 #[cfg(test)]
 mod tests;
