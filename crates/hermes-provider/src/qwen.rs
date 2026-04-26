@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use futures_util::StreamExt;
 use hermes_core::{ChatRequest, ChatResponse, ModelId, ProviderError};
 use serde::{Deserialize, Serialize};
 use reqwest::Client;
@@ -41,8 +42,8 @@ use reqwest::Client;
 //
 // ## 流式输出
 //
-// [`chat_streaming`] 方法当前返回 `Err(ProviderError::Api("Streaming not yet implemented"))`，
-// 表示流式输出功能尚未实现。
+// [`chat_streaming`] 方法通过 SSE（Server-Sent Events）实现流式输出，
+// 使用与 OpenAI 兼容的 `data: ` 前缀格式。
 
 // =============================================================================
 // 请求/响应类型定义
@@ -78,6 +79,9 @@ struct QwenParameters {
     max_tokens: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     result_format: Option<QwenResultFormat>,
+    /// 是否启用流式输出
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stream: Option<bool>,
 }
 
 /// Qwen 响应格式配置
@@ -117,12 +121,47 @@ struct QwenResponseMessage {
 }
 
 /// Qwen Token 使用量统计
-#[derive(Deserialize)]
-struct QwenUsage {
+#\[derive(Deserialize, Debug)\]\nstruct QwenUsage {
     input_tokens: usize,
     output_tokens: usize,
     #[allow(dead_code)]
     total_tokens: usize,
+}
+
+// =============================================================================
+// 流式响应类型定义
+// =============================================================================
+
+/// Qwen 流式响应 Delta
+#[derive(Debug, Deserialize)]
+struct QwenStreamDelta {
+    choices: Vec<QwenStreamChoice>,
+}
+
+/// Qwen 流式响应选项
+#[derive(Debug, Deserialize)]
+struct QwenStreamChoice {
+    delta: QwenStreamContent,
+    finish_reason: Option<String>,
+}
+
+/// Qwen 流式响应内容
+#[derive(Debug, Deserialize)]
+struct QwenStreamContent {
+    role: Option<String>,
+    content: Option<String>,
+}
+
+/// Qwen 流式响应结束标记
+#[derive(Debug, Deserialize)]
+struct QwenStreamFinish {
+    choices: Vec<QwenStreamFinishChoice>,
+}
+
+#[derive(Debug, Deserialize)]
+struct QwenStreamFinishChoice {
+    finish_reason: Option<String>,
+    usage: Option<QwenUsage>,
 }
 
 // =============================================================================
@@ -202,7 +241,7 @@ impl hermes_core::LlmProvider for QwenProvider {
     async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, ProviderError> {
         let url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation";
 
-        let req = convert_request(request);
+        let req = convert_request(request, false);
 
         let response = self
             .client
@@ -225,10 +264,79 @@ impl hermes_core::LlmProvider for QwenProvider {
 
     async fn chat_streaming(
         &self,
-        _request: ChatRequest,
-        _callback: hermes_core::StreamingCallback,
+        request: ChatRequest,
+        callback: hermes_core::StreamingCallback,
     ) -> Result<ChatResponse, ProviderError> {
-        Err(ProviderError::Api("Streaming not yet implemented".into()))
+        let url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation";
+        let req = convert_request(request, true);
+
+        let mut full_content = String::new();
+        let mut finish_reason = hermes_core::FinishReason::Stop;
+
+        let response = self
+            .client
+            .post(url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json")
+            .header("Accept", "text/event-stream")
+            .json(&req)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(ProviderError::Api(format!("HTTP {}: {}", status, body)));
+        }
+
+        let mut stream = response.bytes_stream();
+
+        while let Some(chunk) = stream.next().await {
+            let bytes = chunk.map_err(|e| ProviderError::Network(e))?;
+            let text = String::from_utf8_lossy(&bytes);
+
+            for line in text.lines() {
+                if line.starts_with("data: ") {
+                    let data = &line[6..];
+                    if data.is_empty() {
+                        continue;
+                    }
+                    if data == "[DONE]" {
+                        break;
+                    }
+                    // 尝试解析为流式 delta
+                    if let Ok(delta) = serde_json::from_str::<QwenStreamDelta>(data) {
+                        if let Some(choice) = delta.choices.into_iter().next() {
+                            if let Some(content) = choice.delta.content {
+                                full_content += &content;
+                                callback(ChatResponse {
+                                    content: content.clone(),
+                                    finish_reason: hermes_core::FinishReason::Stop,
+                                    tool_calls: None,
+                                    reasoning: None,
+                                    usage: None,
+                                });
+                            }
+                            if let Some(ref fr) = choice.finish_reason {
+                                finish_reason = match fr.as_str() {
+                                    "stop" => hermes_core::FinishReason::Stop,
+                                    "length" => hermes_core::FinishReason::Length,
+                                    _ => hermes_core::FinishReason::Other,
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(ChatResponse {
+            content: full_content,
+            finish_reason,
+            tool_calls: None,
+            reasoning: None,
+            usage: None,
+        })
     }
 
     fn estimate_tokens(&self, text: &str, _model: &ModelId) -> usize {
@@ -246,7 +354,7 @@ impl hermes_core::LlmProvider for QwenProvider {
     }
 }
 
-fn convert_request(request: ChatRequest) -> QwenRequest {
+fn convert_request(request: ChatRequest, streaming: bool) -> QwenRequest {
     let messages = convert_messages(&request.messages);
 
     // Handle system prompt - Qwen uses a special format
@@ -270,6 +378,7 @@ fn convert_request(request: ChatRequest) -> QwenRequest {
             result_format: Some(QwenResultFormat {
                 message: "message".to_string(),
             }),
+            stream: if streaming { Some(true) } else { None },
         },
     }
 }
