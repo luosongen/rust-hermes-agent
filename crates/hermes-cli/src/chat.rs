@@ -151,7 +151,7 @@ pub async fn run_chat(
 
     let retry_config = RetryConfig::default();
 
-    let agent = Arc::new(Agent::new(
+    let agent: Arc<tokio::sync::RwLock<Agent>> = Arc::new(tokio::sync::RwLock::new(Agent::new(
         provider,
         tool_registry,
         session_store.clone(),
@@ -163,7 +163,7 @@ pub async fn run_chat(
         insights_tracker,
         rate_limit_tracker,
         retry_config,
-    ));
+    )));
 
     // 确定会话 ID
     // 如果提供了会话 ID，则使用它；否则创建新会话
@@ -207,6 +207,7 @@ pub async fn run_chat(
                 let sid = (*session_id).clone();
                 // 调用 Agent 处理对话
                 let response = agent
+                    .write().await
                     .run_conversation(ConversationRequest {
                         content: line.to_string(),
                         session_id: Some(sid),
