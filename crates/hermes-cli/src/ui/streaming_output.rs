@@ -31,7 +31,10 @@ impl OutputChunk {
 
 /// 流式输出处理器
 pub struct StreamingOutput {
+    /// 流式输出是否启用
     enabled: Arc<AtomicBool>,
+    /// 加载动画是否正在运行
+    animating: Arc<AtomicBool>,
     buffer: std::sync::Mutex<String>,
 }
 
@@ -39,6 +42,7 @@ impl StreamingOutput {
     pub fn new() -> Self {
         Self {
             enabled: Arc::new(AtomicBool::new(true)),
+            animating: Arc::new(AtomicBool::new(false)),
             buffer: std::sync::Mutex::new(String::new()),
         }
     }
@@ -128,28 +132,30 @@ impl StreamingOutput {
 
     /// 显示加载动画
     pub fn start_loading(&self, message: &str) {
-        if !self.enabled.load(Ordering::SeqCst) {
-            self.enabled.store(true, Ordering::SeqCst);
-            let enabled = self.enabled.clone();
-            let msg = message.to_string();
-            tokio::spawn(async move {
-                let spinner = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏";
-                let mut i = 0;
-                while enabled.load(Ordering::SeqCst) {
-                    print!("\r{} {}{}\x1B[K", spinner.chars().nth(i % 10).unwrap_or(' '), msg, "...");
-                    std::io::stdout().flush().ok();
-                    tokio::time::sleep(tokio::time::Duration::from_millis(80)).await;
-                    i += 1;
-                }
-                print!("\r\x1B[K");
-                std::io::stdout().flush().ok();
-            });
+        // 如果动画已经在运行，就不再启动新的
+        if self.animating.load(Ordering::SeqCst) {
+            return;
         }
+        self.animating.store(true, Ordering::SeqCst);
+        let animating = self.animating.clone();
+        let msg = message.to_string();
+        tokio::spawn(async move {
+            let spinner = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏";
+            let mut i = 0;
+            while animating.load(Ordering::SeqCst) {
+                print!("\r{} {}{}\x1B[K", spinner.chars().nth(i % 10).unwrap_or(' '), msg, "...");
+                std::io::stdout().flush().ok();
+                tokio::time::sleep(tokio::time::Duration::from_millis(80)).await;
+                i += 1;
+            }
+            print!("\r\x1B[K");
+            std::io::stdout().flush().ok();
+        });
     }
 
     /// 停止加载动画
     pub fn stop_loading(&self) {
-        self.enabled.store(false, Ordering::SeqCst);
+        self.animating.store(false, Ordering::SeqCst);
     }
 }
 
