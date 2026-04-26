@@ -44,7 +44,6 @@ pub mod error;
 pub mod provider;
 pub mod tool_dispatcher;
 pub mod retry;
-pub mod credentials;
 pub mod retrying_provider;
 pub mod agent;
 pub mod conversation;
@@ -80,8 +79,8 @@ pub use insights::{InsightsTracker, InMemoryInsightsTracker, SessionInsights, To
 pub use usage_pricing::{PricingDatabase, PricingTier, CostCalculator};
 pub use rate_limit_tracker::RateLimitTracker;
 
-pub use credentials::CredentialPool;
-pub use credential_pool::{CredentialPool as CredPool, CredentialEntry, CredentialStatus, PoolStrategy};
+// 凭证池导出 — 统一使用 credential_pool 模块 (整合了旧的 credentials.rs)
+pub use credential_pool::{CredentialPool, CredentialEntry, CredentialHealth, CredentialStatus, PoolStrategy};
 pub use retry_utils::{RetryConfig, jittered_backoff, with_retry};
 pub use context_compressor::ContextCompressor;
 pub use retrying_provider::RetryingProvider;

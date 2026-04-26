@@ -52,12 +52,12 @@ impl RetryingProvider {
 
             match result {
                 Ok(response) => {
-                    self.pool.report_success(credential_name);
+                    self.pool.report_success(self.inner.name(), credential_name);
                     return Ok(response);
                 }
                 Err(err) => {
                     if !err.is_retryable() || attempt >= self.policy.max_retries {
-                        self.pool.report_failure(credential_name);
+                        self.pool.report_failure(self.inner.name(), credential_name);
                         return Err(err);
                     }
 
@@ -78,7 +78,7 @@ impl RetryingProvider {
                     // 检查凭证是否被限流
                     if matches!(err, ProviderError::RateLimit(_)) {
                         if let ProviderError::RateLimit(secs) = err {
-                            self.pool.report_rate_limit(credential_name, secs);
+                            self.pool.report_rate_limit(self.inner.name(), credential_name, secs);
                         }
                     }
 
@@ -103,7 +103,7 @@ impl LlmProvider for RetryingProvider {
     async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, ProviderError> {
         let (name, _key) = self
             .pool
-            .get()
+            .get(self.inner.name())
             .ok_or_else(|| ProviderError::Api("No healthy credentials available".into()))?;
 
         self.call_with_retry(request, &name).await

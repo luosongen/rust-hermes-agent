@@ -1,4 +1,4 @@
-use crate::credentials::Secret;
+use crate::credential_pool::Secret;
 use serde::{Deserialize, Serialize};
 
 /// STT provider configuration
