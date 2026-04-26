@@ -66,6 +66,7 @@ pub mod trajectory;
 pub mod usage_pricing;
 pub mod rate_limit_tracker;
 pub mod context_pressure_monitor;
+pub mod metadata_extractor;
 
 pub use compression::{ToolResultPruner, Summarizer, PRUNED_TOOL_PLACEHOLDER};
 pub use context_pressure_monitor::{ContextPressureMonitor, PressureLevel};
