@@ -99,8 +99,8 @@ pub async fn run_chat(
     if !no_tools {
         register_builtin_tools(&tool_registry, environment.clone());
         // 加载技能注册表和管理器，并注册技能管理工具
-        let (_, skill_manager) = load_skill_registry_and_manager();
-        register_skill_tools(&tool_registry, skill_manager);
+        let (_, skill_manager, skill_executor) = load_skill_registry_and_manager();
+        register_skill_tools(&tool_registry, skill_manager, skill_executor);
     }
 
     // 构建 LLM Provider

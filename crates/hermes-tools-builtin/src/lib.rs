@@ -68,6 +68,7 @@ use std::sync::Arc;
 
 use hermes_environment::Environment;
 use hermes_skills::manager::SkillManager;
+use hermes_skills::{SkillExecutor, SkillRegistry};
 use hermes_tool_registry::ToolRegistry;
 use parking_lot::RwLock;
 
@@ -107,6 +108,7 @@ pub fn register_builtin_tools(registry: &ToolRegistry, environment: Arc<dyn Envi
 }
 
 /// 注册技能管理工具
-pub fn register_skill_tools(registry: &ToolRegistry, manager: Arc<RwLock<SkillManager>>) {
+pub fn register_skill_tools(registry: &ToolRegistry, manager: Arc<RwLock<SkillManager>>, executor: Arc<SkillExecutor>) {
     registry.register(SkillManageTool::new(manager));
+    registry.register(SkillExecuteTool::new(Arc::new(RwLock::new(SkillRegistry::new())), executor));
 }
