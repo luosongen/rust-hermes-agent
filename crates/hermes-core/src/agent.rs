@@ -25,7 +25,7 @@
 use crate::{
     AgentError, ChatRequest, ConversationRequest, ConversationResponse, DisplayHandler,
     LlmProvider, ModelId, NudgeConfig, NudgeService, NudgeState, NudgeTrigger, Role,
-    TitleGenerator, ToolContext, ToolDispatcher, TrajectorySaver, RetryConfig,
+    TitleGenerator, ToolContext, ToolDispatcher, TrajectorySaver, RetryConfig, ContextCompressor,
 };
 use crate::insights::{InsightsTracker, ToolCallRecord};
 use crate::rate_limit_tracker::RateLimitTracker;
@@ -79,6 +79,8 @@ pub struct Agent {
     rate_limit_tracker: Option<Arc<RateLimitTracker>>,
     // Retry config
     retry_config: RetryConfig,
+    // 上下文压缩器（跨迭代持久化状态）
+    context_compressor: Option<ContextCompressor>,
 }
 
 impl Agent {
@@ -123,6 +125,7 @@ impl Agent {
             insights_tracker,
             rate_limit_tracker,
             retry_config,
+            context_compressor: None,
         }
     }
 
@@ -156,7 +159,7 @@ impl Agent {
 
     /// Run a conversation
     pub async fn run_conversation(
-        &self,
+        &mut self,
         request: ConversationRequest,
     ) -> Result<ConversationResponse, AgentError> {
         let messages = if let Some(session_id) = &request.session_id {
@@ -209,12 +212,15 @@ impl Agent {
             let monitor = crate::ContextPressureMonitor::new(context_length);
 
             // Proactive compression check (at critical level before first iteration)
+            // 使用 get_or_insert_with 模式复用已存在的压缩器，保持状态持久化
             if monitor.should_compress(prompt_tokens) && iterations == 0 {
-                let mut compressor = crate::ContextCompressor::new(
-                    self.provider.clone(),
-                    self.config.model.clone(),
-                    context_length,
-                );
+                let compressor = self.context_compressor.get_or_insert_with(|| {
+                    crate::ContextCompressor::new(
+                        self.provider.clone(),
+                        self.config.model.clone(),
+                        context_length,
+                    )
+                });
                 match compressor.compress(messages.clone(), None, None).await {
                     Ok(compressed) => {
                         tracing::info!("Context compressed proactively due to high memory pressure ({} tokens)", prompt_tokens);
@@ -406,11 +412,14 @@ impl Agent {
                 }
                 crate::FinishReason::Length => {
                     // 尝试使用上下文压缩
-                    let mut compressor = crate::ContextCompressor::new(
-                        self.provider.clone(),
-                        self.config.model.clone(),
-                        self.provider.context_length(&model_id).unwrap_or(4096),
-                    );
+                    // 使用 get_or_insert_with 模式复用已存在的压缩器，保持状态持久化
+                    let compressor = self.context_compressor.get_or_insert_with(|| {
+                        crate::ContextCompressor::new(
+                            self.provider.clone(),
+                            self.config.model.clone(),
+                            self.provider.context_length(&model_id).unwrap_or(4096),
+                        )
+                    });
 
                     match compressor.compress(messages.clone(), None, None).await {
                         Ok(compressed_messages) => {
