@@ -36,10 +36,77 @@ use crate::ui::{
 };
 use hermes_environment::{EnvironmentManager, LocalEnvironment};
 use hermes_memory::{NewSession, SessionStore, SqliteSessionStore};
-use hermes_provider::OpenAiProvider;
+use hermes_provider::{OpenAiProvider, AnthropicProvider, OpenRouterProvider, GlmProvider, MiniMaxProvider, KimiProvider, DeepSeekProvider, QwenProvider};
 use hermes_tool_registry::ToolRegistry;
 use hermes_tools_builtin::{register_builtin_tools, register_skill_tools, load_skill_registry_and_manager};
 use std::sync::Arc;
+
+/// 根据 model ID 创建对应的 provider
+/// model ID 格式: "provider/model-name" (e.g., "anthropic/claude-3-5-sonnet")
+fn create_provider_for_model(model: &str, api_key: Option<&str>) -> Result<Arc<dyn LlmProvider>> {
+    let (provider_name, _) = model.split_once('/').unwrap_or((model, ""));
+
+    match provider_name {
+        "openai" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("OPENAI_API_KEY").ok())
+                .or_else(|| std::env::var("HERMES_OPENAI_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("OpenAI API key not found"))?;
+            Ok(Arc::new(OpenAiProvider::new(key, None)))
+        }
+        "anthropic" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("Anthropic API key not found"))?;
+            Ok(Arc::new(AnthropicProvider::new(key)))
+        }
+        "openrouter" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("OPENROUTER_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("OpenRouter API key not found"))?;
+            Ok(Arc::new(OpenRouterProvider::new(key)))
+        }
+        "glm" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("GLM_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("GLM API key not found"))?;
+            Ok(Arc::new(GlmProvider::new(key)))
+        }
+        "minimax" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("MINIMAX_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("MiniMax API key not found"))?;
+            Ok(Arc::new(MiniMaxProvider::new(key)))
+        }
+        "kimi" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("KIMI_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("Kimi API key not found"))?;
+            Ok(Arc::new(KimiProvider::new(key)))
+        }
+        "deepseek" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("DEEPSEEK_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("DeepSeek API key not found"))?;
+            Ok(Arc::new(DeepSeekProvider::new(key)))
+        }
+        "qwen" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("QWEN_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("Qwen API key not found"))?;
+            Ok(Arc::new(QwenProvider::new(key)))
+        }
+        _ => Err(anyhow::anyhow!("Unsupported provider: {}", provider_name)),
+    }
+}
 
 /// 运行交互式聊天会话
 ///
@@ -113,21 +180,17 @@ pub async fn run_chat(
                 pool.add(parts[0], parts[1], parts[1]);
             }
         }
-        // 使用 RetryingProvider 包装，添加自动重试逻辑
-        Arc::new(RetryingProvider::new(
-            Arc::new(OpenAiProvider::new(
-                std::env::var("OPENAI_API_KEY")
-                    .or_else(|_| std::env::var("HERMES_OPENAI_API_KEY"))?,
-                None,
-            )),
+        // 使用 RetryingProvider 包装
+        let model_key = model.clone();
+        let inner_provider = create_provider_for_model(&model_key, None)?;
+        Arc::new(hermes_core::RetryingProvider::new(
+            inner_provider,
             Arc::new(pool),
             hermes_core::RetryPolicy::default(),
         ))
     } else {
-        // 使用默认 OpenAI Provider，从环境变量读取 API key
-        let api_key = std::env::var("OPENAI_API_KEY")
-            .or_else(|_| std::env::var("HERMES_OPENAI_API_KEY"))?;
-        Arc::new(OpenAiProvider::new(&api_key, None))
+        // 根据 model ID 创建对应的 provider
+        create_provider_for_model(&model, credentials.as_deref())?
     };
 
     // 构建 Agent
