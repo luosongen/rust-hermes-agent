@@ -93,7 +93,7 @@ impl SlashCommandCompleter {
 
     /// 补全命令前缀
     pub fn complete(&self, prefix: &str) -> Vec<String> {
-        let prefix_lower = prefix.to_lowercase();
+        let prefix_lower = prefix.trim_start_matches('/').to_lowercase();
         self.commands
             .keys()
             .filter(|name| name.to_lowercase().starts_with(&prefix_lower))
