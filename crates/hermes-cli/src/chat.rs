@@ -31,7 +31,7 @@ use hermes_core::{
 };
 use crate::display::CliDisplay;
 use crate::ui::{
-    LineReader, SlashCommandCompleter,
+    LineReader,
     StreamingOutput,
 };
 use hermes_environment::{EnvironmentManager, LocalEnvironment};
@@ -190,8 +190,7 @@ pub async fn run_chat(
     println!("输入消息后按回车发送。Ctrl+C 退出。\n");
 
     // 创建 UI 组件
-    let streaming_output = StreamingOutput::new();
-    let completer = SlashCommandCompleter::new();
+    let loading_animation = StreamingOutput::new();
     let line_reader = LineReader::new(Some("hermes_history.txt"));
     let agent = Arc::clone(&agent);
     let session_id = Arc::new(session_id);
@@ -209,6 +208,10 @@ pub async fn run_chat(
 
         // 克隆会话 ID 用于此次请求
         let sid = (*session_id).clone();
+
+        // 显示加载动画
+        loading_animation.start_loading("处理中");
+
         // 调用 Agent 处理对话
         let response = agent
             .write().await
@@ -218,6 +221,9 @@ pub async fn run_chat(
                 system_prompt: None,
             })
             .await;
+
+        // 停止加载动画
+        loading_animation.stop_loading();
 
         match response {
             Ok(resp) => {
