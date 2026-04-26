@@ -9,7 +9,6 @@ use std::collections::HashSet;
 /// 确定性元数据提取器
 pub struct MetadataExtractor {
     file_pattern: Regex,
-    rust_symbol_pattern: Regex,
     decision_patterns: Vec<Regex>,
 }
 
@@ -17,7 +16,6 @@ impl MetadataExtractor {
     pub fn new() -> Self {
         Self {
             file_pattern: Regex::new(r"([a-zA-Z0-9_\-./]+\.(rs|toml|json|yaml|yml|txt|md|sh|py|js|ts))").unwrap(),
-            rust_symbol_pattern: Regex::new(r"`([a-zA-Z_][a-zA-Z0-9_]*)`").unwrap(),
             decision_patterns: vec![
                 Regex::new(r"决定用\s+(\S+)").unwrap(),
                 Regex::new(r"选择\s+(\S+)").unwrap(),
