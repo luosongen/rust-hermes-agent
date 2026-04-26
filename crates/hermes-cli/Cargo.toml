@@ -15,6 +15,7 @@ figment.workspace = true
 anyhow.workspace = true
 dirs.workspace = true
 rustyline = "15"  # 行编辑和历史
+chrono = "0.4"   # 时间戳
 uuid.workspace = true
 hermes-core.workspace = true
 hermes-memory.workspace = true

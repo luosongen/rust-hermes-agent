@@ -27,6 +27,7 @@ mod commands;
 mod handlers;
 mod chat;
 mod display;
+mod ui;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

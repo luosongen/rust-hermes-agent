@@ -6,18 +6,16 @@ use tokio::sync::Mutex;
 
 /// 异步 readline 封装，提供行编辑和历史功能
 pub struct LineReader {
-    editor: Arc<Mutex<Editor<()>>>,
+    editor: Arc<Mutex<Editor<(), rustyline::history::FileHistory>>>,
 }
 
 impl LineReader {
     /// 创建新的 LineReader
     pub fn new(history_file: Option<&str>) -> Self {
-        let config = Config::builder()
-            .history_ignore_dups(true)
-            .build();
-        let mut editor = Editor::with_config(config);
+        let config = Config::default();
+        let mut editor = Editor::with_config(config).expect("Failed to create editor");
         if let Some(path) = history_file {
-            let _ = editor.load_history(path);
+            let _ = editor.load_history(path).ok();
         }
         Self {
             editor: Arc::new(Mutex::new(editor)),

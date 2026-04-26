@@ -30,13 +30,16 @@ use hermes_core::{
     TrajectorySaver,
 };
 use crate::display::CliDisplay;
+use crate::ui::{
+    LineReader, SlashCommandCompleter,
+    StreamingOutput,
+};
 use hermes_environment::{EnvironmentManager, LocalEnvironment};
 use hermes_memory::{NewSession, SessionStore, SqliteSessionStore};
 use hermes_provider::OpenAiProvider;
 use hermes_tool_registry::ToolRegistry;
 use hermes_tools_builtin::{register_builtin_tools, register_skill_tools, load_skill_registry_and_manager};
 use std::sync::Arc;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 /// 运行交互式聊天会话
 ///
@@ -186,52 +189,42 @@ pub async fn run_chat(
     println!("[Session: {}] ({})", session_id, model);
     println!("输入消息后按回车发送。Ctrl+C 退出。\n");
 
-    // REPL 循环：读取用户输入，发送到 Agent，显示响应
-    let stdin = tokio::io::stdin();
-    let mut reader = BufReader::new(stdin).lines();
+    // 创建 UI 组件
+    let streaming_output = StreamingOutput::new();
+    let completer = SlashCommandCompleter::new();
+    let line_reader = LineReader::new(Some("hermes_history.txt"));
     let agent = Arc::clone(&agent);
     let session_id = Arc::new(session_id);
 
     loop {
-        print!("> ");
-        tokio::io::stdout().flush().await?;
+        let line = match line_reader.read_line("> ").await {
+            Ok(l) => l,
+            Err(_) => break,
+        };
 
-        match reader.next_line().await {
-            Ok(Some(line)) => {
-                let line = line.trim();
-                if line.is_empty() {
-                    continue;
-                }
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
 
-                // 克隆会话 ID 用于此次请求
-                let sid = (*session_id).clone();
-                // 调用 Agent 处理对话
-                let response = agent
-                    .write().await
-                    .run_conversation(ConversationRequest {
-                        content: line.to_string(),
-                        session_id: Some(sid),
-                        system_prompt: None,
-                    })
-                    .await;
+        // 克隆会话 ID 用于此次请求
+        let sid = (*session_id).clone();
+        // 调用 Agent 处理对话
+        let response = agent
+            .write().await
+            .run_conversation(ConversationRequest {
+                content: line.to_string(),
+                session_id: Some(sid),
+                system_prompt: None,
+            })
+            .await;
 
-                match response {
-                    Ok(resp) => {
-                        println!("[Agent] {}\n", resp.content);
-                    }
-                    Err(e) => {
-                        eprintln!("[错误] {}\n", e);
-                    }
-                }
-            }
-            Ok(None) => {
-                // EOF (Ctrl+D)
-                println!("\n再见!");
-                break;
+        match response {
+            Ok(resp) => {
+                println!("[Agent] {}\n", resp.content);
             }
             Err(e) => {
-                eprintln!("读取输入错误: {}", e);
-                break;
+                eprintln!("[错误] {}\n", e);
             }
         }
     }

@@ -1,5 +1,6 @@
 //! StreamingOutput — 流式输出显示
 
+use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
