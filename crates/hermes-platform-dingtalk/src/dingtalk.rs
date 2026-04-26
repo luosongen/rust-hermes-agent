@@ -83,7 +83,9 @@ impl PlatformAdapter for DingTalkAdapter {
     }
 
     fn verify_webhook(&self, _request: &axum::extract::Request<axum::body::Body>) -> bool {
-        // 钉钉 Stream Mode 不使用 webhook 验证
+        // 钉钉 Stream Mode 使用长连接，连接时已通过 client_id/client_secret 验证
+        // 传统 callback 模式需要 URL 签名验证（timestamp + secret + token 的 SHA1）
+        // 此适配器使用 Stream Mode，无需 webhook 级别验证
         true
     }
 

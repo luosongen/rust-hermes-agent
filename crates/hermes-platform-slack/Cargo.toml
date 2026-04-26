@@ -18,6 +18,9 @@ urlencoding = { workspace = true }
 chrono = { workspace = true }
 axum = { workspace = true }
 hermes-core = { workspace = true }
+hmac = { workspace = true }
+sha2 = { workspace = true }
+hex = "0.4"
 
 [dev-dependencies]
 tokio-test = "0.4"

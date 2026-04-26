@@ -218,17 +218,159 @@ impl PlatformAdapter for SlackAdapter {
         "slack"
     }
 
-    fn verify_webhook(&self, _request: &axum::extract::Request<axum::body::Body>) -> bool {
-        // TODO: 实现 Slack signing secret 验证
-        // Slack 使用 HMAC-SHA256 签名验证请求
-        true
+    fn verify_webhook(&self, request: &axum::extract::Request<axum::body::Body>) -> bool {
+        // Slack 签名验证需要在 parse_inbound 中进行（需要 body）
+        // 此处只检查必要头部是否存在
+        let headers = request.headers();
+        headers.contains_key("X-Slack-Signature") && headers.contains_key("X-Slack-Request-Timestamp")
     }
 
     async fn parse_inbound(
         &self,
         request: axum::extract::Request<axum::body::Body>,
     ) -> Result<InboundMessage, GatewayError> {
-        let body = axum::body::to_bytes(request.into_body(), 1024 * 1024)
+        let (parts, body) = request.into_parts();
+
+        // 验证 Slack 签名
+        let signing_secret = self.signing_secret.read().await.clone();
+        if let Some(ref secret) = signing_secret {
+            let signature = parts
+                .headers
+                .get("X-Slack-Signature")
+                .and_then(|v| v.to_str().ok())
+                .ok_or_else(|| GatewayError::VerificationFailed("Missing X-Slack-Signature header".into()))?;
+
+            let timestamp = parts
+                .headers
+                .get("X-Slack-Request-Timestamp")
+                .and_then(|v| v.to_str().ok())
+                .ok_or_else(|| GatewayError::VerificationFailed("Missing X-Slack-Request-Timestamp header".into()))?;
+
+            let body = axum::body::to_bytes(body, 1024 * 1024)
+                .await
+                .map_err(|e| GatewayError::ParseError(e.to_string()))?;
+
+            // Slack 签名格式: v0={hmac_hex}
+            // 签名基: v0:{timestamp}:{body}
+            let base_string = format!("v0:{}:{}", timestamp, String::from_utf8_lossy(&body));
+
+            use hmac::{Hmac, Mac};
+            use sha2::Sha256;
+            type HmacSha256 = Hmac<Sha256>;
+
+            let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
+                .map_err(|_| GatewayError::VerificationFailed("Invalid signing secret".into()))?;
+            mac.update(base_string.as_bytes());
+
+            let result = mac.finalize();
+            let expected_sig = format!("v0={}", hex::encode(result.into_bytes()));
+
+            // 使用 constant-time 比较防止时序攻击
+            let sig_bytes = signature.as_bytes();
+            let expected_bytes = expected_sig.as_bytes();
+            let mut diff = 0u8;
+            for (a, b) in expected_bytes.iter().zip(sig_bytes.iter()) {
+                diff |= a ^ b;
+            }
+            if diff != 0 || expected_bytes.len() != sig_bytes.len() {
+                return Err(GatewayError::VerificationFailed("Invalid Slack signature".into()));
+            }
+
+            let body_str = String::from_utf8_lossy(&body);
+
+            // 尝试解析为 URL verification challenge
+            let verify: SlackEventWrapper = serde_json::from_str(&body_str)
+                .map_err(|e| GatewayError::ParseError(e.to_string()))?;
+
+            // URL 验证请求
+            if verify.event_type.as_deref() == Some("url_verification") {
+                let challenge = verify.challenge.clone().unwrap_or_default();
+                return Ok(InboundMessage {
+                    platform: "slack".to_string(),
+                    sender_id: "slack".to_string(),
+                    content: challenge,
+                    session_id: "slack:url_verification".to_string(),
+                    timestamp: Utc::now(),
+                    raw: serde_json::to_value(&verify).unwrap_or_default(),
+                });
+            }
+
+            // 处理事件回调
+            if let Some(event) = verify.event {
+                match event {
+                    SlackEvent::EventCallback { event: event_data, .. } => {
+                        match event_data {
+                            SlackEventData::Message(msg) => {
+                                let sender_id = msg.user.clone();
+                                let session_id = format!("slack:{}", msg.channel);
+                                let text = msg.text.clone();
+                                return Ok(InboundMessage {
+                                    platform: "slack".to_string(),
+                                    sender_id,
+                                    content: text,
+                                    session_id,
+                                    timestamp: Utc::now(),
+                                    raw: serde_json::to_value(&msg).unwrap_or_default(),
+                                });
+                            }
+                            SlackEventData::AppMention(msg) => {
+                                let sender_id = msg.user.clone();
+                                let session_id = format!("slack:{}", msg.channel);
+                                let text = msg.text.clone();
+                                return Ok(InboundMessage {
+                                    platform: "slack".to_string(),
+                                    sender_id,
+                                    content: text,
+                                    session_id,
+                                    timestamp: Utc::now(),
+                                    raw: serde_json::to_value(&msg).unwrap_or_default(),
+                                });
+                            }
+                        }
+                    }
+                    SlackEvent::UrlVerification { challenge } => {
+                        return Ok(InboundMessage {
+                            platform: "slack".to_string(),
+                            sender_id: "slack".to_string(),
+                            content: challenge,
+                            session_id: "slack:verification".to_string(),
+                            timestamp: Utc::now(),
+                            raw: serde_json::json!({"type": "url_verification"}),
+                        });
+                    }
+                }
+            }
+
+            // 尝试解析为 Interactive Message payload
+            let interaction: Result<SlackInteractionPayload, _> = serde_json::from_str(&body_str);
+            if let Ok(payload) = interaction {
+                let sender_id = payload.user.id.clone();
+                let session_id = format!("slack:{}", payload.channel.id);
+
+                let content = if let Some(actions) = &payload.actions {
+                    actions.iter()
+                        .filter_map(|a| a.value.clone())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                } else {
+                    payload.callback_id.clone().unwrap_or_default()
+                };
+
+                return Ok(InboundMessage {
+                    platform: "slack".to_string(),
+                    sender_id,
+                    content,
+                    session_id,
+                    timestamp: Utc::now(),
+                    raw: serde_json::to_value(&payload).unwrap_or_default(),
+                });
+            }
+
+            return Err(GatewayError::ParseError("Unknown Slack payload format".to_string()));
+        }
+
+        // 无 signing_secret 配置时，直接解析 body
+        let body = axum::body::to_bytes(body, 1024 * 1024)
             .await
             .map_err(|e| GatewayError::ParseError(e.to_string()))?;
         let body_str = String::from_utf8_lossy(&body);

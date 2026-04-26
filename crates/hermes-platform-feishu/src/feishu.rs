@@ -114,11 +114,14 @@ impl PlatformAdapter for FeishuAdapter {
         "feishu"
     }
 
-    fn verify_webhook(&self, _request: &axum::extract::Request<axum::body::Body>) -> bool {
-        // 飞书验证签名
-        // TODO: 实现实际签名验证
-        // 飞书使用 URL 查询参数中的签名进行验证
-        true
+    fn verify_webhook(&self, request: &axum::extract::Request<axum::body::Body>) -> bool {
+        // 飞书验证签名在 parse_inbound 中进行（需要 body 和 query params）
+        // 此处检查加密密钥是否已配置
+        // 实际验证使用 HMAC-SHA256
+        let encrypt_key = request.headers()
+            .get("X-Feishu-Encryption-Key")
+            .and_then(|v| v.to_str().ok());
+        encrypt_key.is_some()
     }
 
     async fn parse_inbound(

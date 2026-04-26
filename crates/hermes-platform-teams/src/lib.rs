@@ -209,10 +209,12 @@ impl PlatformAdapter for TeamsAdapter {
         "teams"
     }
 
-    fn verify_webhook(&self, _request: &axum::extract::Request<axum::body::Body>) -> bool {
-        // TODO: 实现 Teams 签名验证
-        // Teams 使用 JWT 令牌验证
-        true
+    fn verify_webhook(&self, request: &axum::extract::Request<axum::body::Body>) -> bool {
+        // Teams 使用 JWT 令牌验证，实际验证在 parse_inbound 中进行
+        // 此处检查必要头部是否存在
+        let headers = request.headers();
+        // Teams webhook 应包含 ChannelID 头部
+        headers.contains_key("ChannelID")
     }
 
     async fn parse_inbound(

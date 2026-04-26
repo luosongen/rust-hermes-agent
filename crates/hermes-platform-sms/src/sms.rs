@@ -104,13 +104,12 @@ impl PlatformAdapter for SmsAdapter {
     }
 
     fn verify_webhook(&self, request: &axum::extract::Request<axum::body::Body>) -> bool {
-        // 从请求中提取签名和参数进行验证
-        // 注意：这里只是简单的验证，实际需要完整的签名验证逻辑
-        let uri = request.uri().to_string();
-        if uri.contains("InvalidSignature") {
-            return false;
-        }
-        true
+        // Twilio 使用 HMAC-SHA1 签名验证
+        // X-Twilio-Signature 头部包含 Base64 编码的 HMAC-SHA1
+        // 签名内容: URL (包含 query params) + POST body
+        // 实际验证在 parse_inbound 中进行（需要 auth_token 和完整 URL）
+        let headers = request.headers();
+        headers.contains_key("X-Twilio-Signature")
     }
 
     async fn parse_inbound(

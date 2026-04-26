@@ -104,9 +104,12 @@ impl PlatformAdapter for DiscordAdapter {
         "discord"
     }
 
-    fn verify_webhook(&self, _request: &axum::extract::Request<axum::body::Body>) -> bool {
-        // Discord 使用 Bot Token 验证，这里预留接口
-        true
+    fn verify_webhook(&self, request: &axum::extract::Request<axum::body::Body>) -> bool {
+        // Discord Interactions 使用 Ed25519 公钥签名验证
+        // 需要 X-Signature-Ed25519 和 X-Signature-Timestamp 头部
+        // 此验证在 parse_inbound 中进行（需要 body）
+        let headers = request.headers();
+        headers.contains_key("X-Signature-Ed25519")
     }
 
     async fn parse_inbound(

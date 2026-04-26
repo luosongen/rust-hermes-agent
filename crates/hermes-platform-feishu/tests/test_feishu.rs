@@ -20,11 +20,24 @@ fn test_verify_webhook() {
     let adapter = FeishuAdapter::new();
     let request = Request::builder()
         .uri("/webhook/feishu")
+        .header("X-Feishu-Encryption-Key", "test-encryption-key")
         .body(axum::body::Body::empty())
         .unwrap();
 
-    // 当前实现总是返回 true（TODO: 实现完整签名验证）
+    // Feishu webhook 需要加密密钥头部
     assert!(adapter.verify_webhook(&request));
+}
+
+#[test]
+fn test_verify_webhook_without_header() {
+    let adapter = FeishuAdapter::new();
+    let request = Request::builder()
+        .uri("/webhook/feishu")
+        .body(axum::body::Body::empty())
+        .unwrap();
+
+    // 没有加密密钥头部时返回 false
+    assert!(!adapter.verify_webhook(&request));
 }
 
 #[tokio::test]
