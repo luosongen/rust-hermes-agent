@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS compressed_segments (
     start_message_id INTEGER NOT NULL,
     end_message_id INTEGER NOT NULL,
     summary TEXT NOT NULL,
+    metadata TEXT NOT NULL,
     vector BLOB NOT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY (session_id) REFERENCES sessions(id)
@@ -545,16 +546,22 @@ impl SqliteSessionStore {
             .flat_map(|f| f.to_le_bytes())
             .collect();
 
+        let summary_json = serde_json::to_string(&segment.summary)
+            .map_err(|e| StorageError::Query(format!("Failed to serialize summary: {}", e)))?;
+        let metadata_json = serde_json::to_string(&segment.metadata)
+            .map_err(|e| StorageError::Query(format!("Failed to serialize metadata: {}", e)))?;
+
         sqlx::query(
             r#"INSERT INTO compressed_segments
-               (id, session_id, start_message_id, end_message_id, summary, vector, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)"#
+               (id, session_id, start_message_id, end_message_id, summary, metadata, vector, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#
         )
         .bind(&segment.id)
         .bind(&segment.session_id)
         .bind(segment.start_message_id)
         .bind(segment.end_message_id)
-        .bind(&segment.summary)
+        .bind(&summary_json)
+        .bind(&metadata_json)
         .bind(&vector_bytes)
         .bind(segment.created_at.to_rfc3339())
         .execute(&self.pool)
@@ -596,6 +603,7 @@ impl SqliteSessionStore {
             start_message_id: i64,
             end_message_id: i64,
             summary: String,
+            metadata: String,
             vector: Vec<u8>,
             created_at: String,
         }
@@ -625,12 +633,18 @@ impl SqliteSessionStore {
                     .map_err(|e| StorageError::Query(format!("Invalid date format: {}", e)))?
                     .with_timezone(&chrono::Utc);
 
+                let summary: crate::compressed::SegmentSummary = serde_json::from_str(&r.summary)
+                    .map_err(|e| StorageError::Query(format!("Failed to deserialize summary: {}", e)))?;
+                let metadata: crate::compressed::MetadataIndex = serde_json::from_str(&r.metadata)
+                    .map_err(|e| StorageError::Query(format!("Failed to deserialize metadata: {}", e)))?;
+
                 Ok(CompressedSegment {
                     id: r.id,
                     session_id: r.session_id,
                     start_message_id: r.start_message_id,
                     end_message_id: r.end_message_id,
-                    summary: r.summary,
+                    metadata,
+                    summary,
                     vector,
                     created_at,
                 })

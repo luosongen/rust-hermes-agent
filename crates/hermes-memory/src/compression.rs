@@ -1,6 +1,6 @@
 //! Context compression manager
 
-use crate::compressed::CompressedSegment;
+use crate::compressed::{CompressedSegment, MetadataIndex, SegmentSummary};
 use crate::compression_config::CompressionConfig;
 use crate::compression_error::CompressionError;
 use crate::session::SessionStore;
@@ -121,7 +121,13 @@ impl<S: SessionStore> CompressionManager<S> {
             session_id.to_string(),
             start_id,
             end_id,
-            summary,
+            MetadataIndex::default(),
+            SegmentSummary {
+                goal: summary.clone(),
+                progress: String::new(),
+                reasoning: String::new(),
+                remaining: String::new(),
+            },
             vector,
         );
 
