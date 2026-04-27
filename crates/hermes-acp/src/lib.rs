@@ -9,7 +9,7 @@
 //! - 会话管理和历史记录
 //! - 与 Hermes Agent 核心功能的集成
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::RwLock;
 
 /// ACP 服务器实现
@@ -39,7 +39,7 @@ struct SessionState {
     /// 当前工作目录
     cwd: String,
     /// Hermes Agent 实例
-    agent: Arc<hermes_core::Agent>,
+    agent: Arc<Mutex<hermes_core::Agent>>,
     /// 会话存储，用于持久化会话数据
     session_store: Arc<dyn hermes_memory::SessionStore>,
     /// 对话历史记录
@@ -106,7 +106,7 @@ impl AcpServer {
             session_id: session_id.clone(),
             cwd,
             // 创建 Hermes Agent 实例
-            agent: Arc::new(hermes_core::Agent::new(
+            agent: Arc::new(Mutex::new(hermes_core::Agent::new(
                 // 创建 OpenAI 提供者（TODO: 后续可扩展为支持多种提供者）
                 Arc::new(hermes_provider::OpenAiProvider::new(
                     &std::env::var("OPENAI_API_KEY").unwrap_or_default(),
@@ -124,7 +124,7 @@ impl AcpServer {
                 None,
                 None,
                 hermes_core::RetryConfig::default(),
-            )),
+            ))),
             // 创建会话存储
             session_store: Arc::new(hermes_memory::SqliteSessionStore::new("hermes.db".into()).await.unwrap()),
             // 初始化空的对话历史
@@ -191,7 +191,7 @@ impl AcpServer {
             };
 
             // 运行对话
-            let response = session.agent.run_conversation(request).await;
+            let response = session.agent.lock().unwrap().run_conversation(request).await;
 
             match response {
                 Ok(resp) => {
@@ -297,7 +297,7 @@ impl AcpServer {
     fn cmd_model(&self, args: &str, session: &mut SessionState) -> String {
         if args.is_empty() {
             // 显示当前模型
-            let model = session.agent.config().model.clone();
+            let model = session.agent.lock().unwrap().config().model.clone();
             "当前模型: ".to_string() + &model
         } else {
             // TODO: 实现模型切换功能
@@ -316,7 +316,7 @@ impl AcpServer {
     /// 包含工具列表的字符串
     fn cmd_tools(&self, session: &mut SessionState) -> String {
         // 获取工具定义
-        let tools = session.agent.tools().get_definitions();
+        let tools = session.agent.lock().unwrap().tools().get_definitions();
         if tools.is_empty() {
             "没有可用的工具。".to_string()
         } else {
@@ -355,7 +355,7 @@ impl AcpServer {
             }
 
             // 获取当前模型
-            let model = session.agent.config().model.clone();
+            let model = session.agent.lock().unwrap().config().model.clone();
             // 格式化上下文信息
             format!(
                 "对话: {} 条消息\n  user: {}, assistant: {}, tool: {}, system: {}\n模型: {}",
