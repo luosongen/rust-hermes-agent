@@ -11,6 +11,73 @@
 
 use std::sync::{Arc, Mutex};
 use tokio::sync::RwLock;
+use anyhow::Result;
+
+/// 根据 model ID 创建对应的 provider
+fn create_provider_for_model(model: &str, api_key: Option<&str>) -> Result<Arc<dyn hermes_core::LlmProvider>> {
+    let (provider_name, _) = model.split_once('/').unwrap_or((model, ""));
+
+    match provider_name {
+        "openai" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("OPENAI_API_KEY").ok())
+                .or_else(|| std::env::var("HERMES_OPENAI_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("OpenAI API key not found"))?;
+            Ok(Arc::new(hermes_provider::OpenAiProvider::new(key, None)))
+        }
+        "anthropic" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("Anthropic API key not found"))?;
+            Ok(Arc::new(hermes_provider::AnthropicProvider::new(key)))
+        }
+        "openrouter" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("OPENROUTER_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("OpenRouter API key not found"))?;
+            Ok(Arc::new(hermes_provider::OpenRouterProvider::new(key)))
+        }
+        "glm" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("GLM_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("GLM API key not found"))?;
+            Ok(Arc::new(hermes_provider::GlmProvider::new(key)))
+        }
+        "minimax" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("MINIMAX_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("MiniMax API key not found"))?;
+            Ok(Arc::new(hermes_provider::MiniMaxProvider::new(key)))
+        }
+        "kimi" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("KIMI_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("Kimi API key not found"))?;
+            Ok(Arc::new(hermes_provider::KimiProvider::new(key)))
+        }
+        "deepseek" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("DEEPSEEK_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("DeepSeek API key not found"))?;
+            Ok(Arc::new(hermes_provider::DeepSeekProvider::new(key)))
+        }
+        "qwen" => {
+            let key = api_key
+                .map(String::from)
+                .or_else(|| std::env::var("QWEN_API_KEY").ok())
+                .ok_or_else(|| anyhow::anyhow!("Qwen API key not found"))?;
+            Ok(Arc::new(hermes_provider::QwenProvider::new(key)))
+        }
+        _ => Err(anyhow::anyhow!("Unsupported provider: {}", provider_name)),
+    }
+}
 
 /// ACP 服务器实现
 /// 
@@ -102,16 +169,15 @@ impl AcpServer {
         let session_id = uuid::Uuid::new_v4().to_string();
         
         // 创建会话状态
+        let provider = create_provider_for_model(&self.agent_config.model, None)
+            .expect("Failed to create provider for model");
+
         let session_state = SessionState {
             session_id: session_id.clone(),
             cwd,
             // 创建 Hermes Agent 实例
             agent: Arc::new(Mutex::new(hermes_core::Agent::new(
-                // 创建 OpenAI 提供者（TODO: 后续可扩展为支持多种提供者）
-                Arc::new(hermes_provider::OpenAiProvider::new(
-                    &std::env::var("OPENAI_API_KEY").unwrap_or_default(),
-                    None,
-                )),
+                provider,
                 // 创建工具注册表
                 Arc::new(hermes_tool_registry::ToolRegistry::new()),
                 // 创建 SQLite 会话存储

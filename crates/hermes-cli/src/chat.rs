@@ -26,7 +26,7 @@
 use anyhow::Result;
 use hermes_core::{
     Agent, AgentConfig, ConversationRequest, DisplayHandler, InMemoryInsightsTracker,
-    InsightsTracker, LlmProvider, PoolStrategy, RateLimitTracker, RetryingProvider, RetryConfig, TitleGenerator,
+    InsightsTracker, LlmProvider, PoolStrategy, RateLimitTracker, RetryConfig, TitleGenerator,
     TrajectorySaver,
 };
 use crate::display::CliDisplay;
