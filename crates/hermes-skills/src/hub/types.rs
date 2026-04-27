@@ -106,3 +106,12 @@ pub struct MarketSkill {
     pub download_url: String,
     pub checksum: String,
 }
+
+/// Frontmatter 元数据
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct Metadata {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub category: Option<String>,
+    pub version: Option<String>,
+}
