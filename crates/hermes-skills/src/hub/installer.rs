@@ -7,6 +7,38 @@ use crate::hub::market::MarketClient;
 use crate::hub::security::SecurityScanner;
 use crate::hub::types::{SkillIndexEntry, SkillSource};
 
+/// 从 git URL 克隆仓库（浅克隆）
+fn git_clone(url: &str, _branch: &str, dest: &std::path::Path) -> Result<(), HubError> {
+    git2::Repository::clone(url, dest)
+        .map_err(|e| HubError::InstallFailed(format!("Git clone failed: {}", e)))?;
+    Ok(())
+}
+
+/// 查找目录中所有 .md 文件
+fn find_markdown_files(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    walkdir::WalkDir::new(dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
+        .map(|e| e.path().to_path_buf())
+        .collect()
+}
+
+/// 解析 frontmatter
+/// 返回 (Metadata, 正文内容)
+fn parse_frontmatter(content: &str) -> (crate::hub::types::Metadata, &str) {
+    if content.starts_with("---") {
+        if let Some(end) = content[3..].find("---") {
+            let yaml_str = &content[3..end + 3];
+            let body = content[end + 6..].trim();
+            let meta: crate::hub::types::Metadata =
+                serde_yaml::from_str(yaml_str).unwrap_or_default();
+            return (meta, body);
+        }
+    }
+    (crate::hub::types::Metadata::default(), content.trim())
+}
+
 pub struct Installer {
     index: SkillIndex,
     market: MarketClient,
