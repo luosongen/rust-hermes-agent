@@ -136,11 +136,95 @@ impl Installer {
             return Err(HubError::AlreadyInstalled(existing.id));
         }
 
-        // TODO: Implement git clone and extract
-        // For now, return error indicating this is not yet implemented
-        return Err(HubError::InstallFailed(
-            "Git installation not yet implemented".to_string(),
-        ));
+        // Create temp directory for clone
+        let temp_dir = tempfile::tempdir()
+            .map_err(|e| HubError::InstallFailed(format!("Temp dir failed: {}", e)))?;
+        let temp_path = temp_dir.path();
+
+        // Clone repository
+        git_clone(git_url, branch, temp_path)
+            .map_err(|e| HubError::InstallFailed(format!("Git clone failed: {}", e)))?;
+
+        // Find all markdown files
+        let md_files = find_markdown_files(temp_path);
+        if md_files.is_empty() {
+            return Err(HubError::InstallFailed(
+                "No markdown files found in repository".to_string(),
+            ));
+        }
+
+        // Process each markdown file
+        let mut entries = Vec::new();
+        for file_path in &md_files {
+            let content = std::fs::read_to_string(file_path)
+                .map_err(|e| HubError::IoError(e))?;
+
+            // Parse frontmatter
+            let (meta, _body) = parse_frontmatter(&content);
+
+            // Determine skill name and category
+            let skill_name = meta.name
+                .as_ref()
+                .map(|n| n.as_str())
+                .unwrap_or(name);
+            let skill_category = meta.category
+                .as_ref()
+                .map(|c| c.as_str())
+                .unwrap_or(category);
+            let skill_id = format!("{}/{}", skill_category, skill_name);
+
+            // Skip if already installed (unless force)
+            if !force {
+                if let Some(existing) = self.index.get_skill(&skill_id)? {
+                    continue; // Skip this file
+                }
+            }
+
+            // Security scan
+            let scan_result = self.scanner.scan(&content);
+            if !scan_result.passed && !force {
+                return Err(HubError::SecurityBlocked {
+                    skill: skill_id.clone(),
+                    threats_len: scan_result.threats.len(),
+                });
+            }
+
+            // Calculate checksum
+            let mut hasher = Sha256::new();
+            hasher.update(content.as_bytes());
+            let checksum = format!("sha256:{:x}", hasher.finalize());
+
+            // Write to skills directory
+            let category_dir = self.skills_dir.join(skill_category);
+            std::fs::create_dir_all(&category_dir)?;
+            let dest_path = category_dir.join(format!("{}.md", skill_name));
+            std::fs::write(&dest_path, &content)?;
+
+            // Create index entry
+            let entry = SkillIndexEntry {
+                id: skill_id.clone(),
+                name: skill_name.to_string(),
+                description: meta.description.unwrap_or_default(),
+                category: skill_category.to_string(),
+                version: meta.version.unwrap_or_else(|| "1.0.0".to_string()),
+                source: SkillSource::Git {
+                    url: git_url.to_string(),
+                    branch: branch.to_string(),
+                },
+                checksum,
+                file_path: dest_path.to_string_lossy().to_string(),
+                installed_at: Utc::now(),
+                updated_at: Utc::now(),
+            };
+
+            // Add to index
+            self.index.add_skill(&entry)?;
+            entries.push(entry);
+        }
+
+        // Return first entry (or error if none installed)
+        entries.into_iter().next()
+            .ok_or_else(|| HubError::InstallFailed("No skills installed".to_string()))
     }
 
     pub fn uninstall(&self, id: &str) -> Result<(), HubError> {
