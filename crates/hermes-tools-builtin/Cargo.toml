@@ -17,6 +17,7 @@ hermes-core.workspace = true
 hermes-tool-registry.workspace = true
 hermes-skills.workspace = true
 hermes-environment.workspace = true
+hermes-checkpoint.workspace = true
 parking_lot.workspace = true
 toml.workspace = true
 uuid.workspace = true

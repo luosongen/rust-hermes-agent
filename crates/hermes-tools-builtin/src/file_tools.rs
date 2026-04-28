@@ -240,7 +240,7 @@ impl hermes_tool_registry::Tool for WriteFileTool {
     async fn execute(
         &self,
         args: serde_json::Value,
-        _context: ToolContext,
+        context: ToolContext,
     ) -> Result<String, ToolError> {
         let path_str = args["path"]
             .as_str()
@@ -251,10 +251,14 @@ impl hermes_tool_registry::Tool for WriteFileTool {
             .ok_or_else(|| ToolError::InvalidArgs("content must be string".into()))?;
 
         let path = PathBuf::from(path_str);
-        let workdir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
         // Security: validate path does not escape workdir or touch sensitive dirs
-        let normalized = validate_path_within_workdir(&path, &workdir)?;
+        let normalized = validate_path_within_workdir(&path, &context.working_directory)?;
+
+        // 自动检查点：写入前对文件创建快照
+        if let Some(cm) = &context.checkpoint_manager {
+            let _ = cm.snapshot_file(&normalized, &context.working_directory).await;
+        }
 
         self.environment
             .write_file(&normalized, content)

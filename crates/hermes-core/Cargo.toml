@@ -16,6 +16,7 @@ uuid.workspace = true
 reqwest.workspace = true
 hermes-error.workspace = true
 hermes-memory.workspace = true
+hermes-checkpoint.workspace = true
 rand.workspace = true
 parking_lot.workspace = true
 axum.workspace = true

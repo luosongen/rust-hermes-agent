@@ -1,6 +1,8 @@
 //! Delegate types — parameters and result structures for subagent delegation.
 
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::broadcast;
 
 /// Maximum delegation depth (parent=0, child=1, grandchild=2).
 pub const MAX_DELEGATION_DEPTH: u8 = 2;
@@ -10,6 +12,9 @@ pub const DEFAULT_MAX_CONCURRENT: usize = 3;
 
 /// Default max iterations per subagent.
 pub const DEFAULT_MAX_ITERATIONS: u32 = 50;
+
+/// Default timeout in seconds.
+pub const DEFAULT_TIMEOUT_SECONDS: u64 = 300;
 
 /// Tools always stripped from subagents.
 pub const BLOCKED_TOOLS: &[&str] = &[
@@ -34,6 +39,9 @@ pub struct DelegateParams {
     pub toolsets: Option<Vec<String>>,
     #[serde(default = "default_max_iterations")]
     pub max_iterations: u32,
+    /// 任务 ID（用于进度报告）
+    #[serde(default)]
+    pub task_id: Option<String>,
 }
 
 /// Batch delegation parameters (parallel execution).
@@ -54,6 +62,9 @@ pub struct DelegateTask {
     pub toolsets: Option<Vec<String>>,
     #[serde(default = "default_max_iterations")]
     pub max_iterations: u32,
+    /// 任务 ID（用于进度报告）
+    #[serde(default)]
+    pub task_id: Option<String>,
 }
 
 fn default_max_iterations() -> u32 {
@@ -62,6 +73,58 @@ fn default_max_iterations() -> u32 {
 
 fn default_max_concurrent() -> usize {
     DEFAULT_MAX_CONCURRENT
+}
+
+// =============================================================================
+// Progress reporting
+// =============================================================================
+
+/// 进度报告通道
+pub type ProgressSender = broadcast::Sender<DelegateProgress>;
+
+/// 进度报告接收器
+pub type ProgressReceiver = broadcast::Receiver<DelegateProgress>;
+
+/// 创建进度报告通道
+pub fn create_progress_channel() -> (ProgressSender, ProgressReceiver) {
+    broadcast::channel(16)
+}
+
+/// 委托任务进度报告
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DelegateProgress {
+    /// 任务 ID
+    pub task_id: String,
+    /// 当前状态
+    pub status: DelegateProgressStatus,
+    /// 状态消息
+    pub message: String,
+    /// 进度百分比 (0-100)
+    pub percentage: Option<u8>,
+    /// 已调用工具次数
+    pub tool_calls: u32,
+    /// 已消耗 API 调用次数
+    pub api_calls: u32,
+    /// 已运行时间（毫秒）
+    pub elapsed_ms: u64,
+}
+
+/// 进度状态
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum DelegateProgressStatus {
+    /// 等待执行
+    Pending,
+    /// 正在执行
+    Running,
+    /// 已完成
+    Completed,
+    /// 已失败
+    Failed,
+    /// 已超时
+    Timeout,
+    /// 已取消
+    Cancelled,
 }
 
 // =============================================================================
@@ -80,6 +143,9 @@ pub struct DelegateResult {
     pub exit_reason: String,
     #[serde(default)]
     pub tool_trace: Vec<ToolTraceEntry>,
+    /// 任务 ID
+    #[serde(default)]
+    pub task_id: Option<String>,
 }
 
 /// Status of a delegation task.
@@ -90,6 +156,7 @@ pub enum DelegateStatus {
     Failed,
     Interrupted,
     Error,
+    Timeout,
 }
 
 impl std::fmt::Display for DelegateStatus {
@@ -99,6 +166,7 @@ impl std::fmt::Display for DelegateStatus {
             DelegateStatus::Failed => write!(f, "failed"),
             DelegateStatus::Interrupted => write!(f, "interrupted"),
             DelegateStatus::Error => write!(f, "error"),
+            DelegateStatus::Timeout => write!(f, "timeout"),
         }
     }
 }
@@ -117,4 +185,23 @@ pub struct ToolTraceEntry {
 pub struct BatchDelegateResult {
     pub results: Vec<DelegateResult>,
     pub total_duration_ms: u64,
+    /// 成功任务数
+    pub success_count: usize,
+    /// 失败任务数
+    pub failed_count: usize,
+}
+
+impl BatchDelegateResult {
+    pub fn new(results: Vec<DelegateResult>) -> Self {
+        let success_count = results.iter().filter(|r| r.status == DelegateStatus::Completed).count();
+        let failed_count = results.len() - success_count;
+        let total_duration_ms = results.iter().map(|r| r.duration_ms).sum();
+
+        Self {
+            results,
+            total_duration_ms,
+            success_count,
+            failed_count,
+        }
+    }
 }

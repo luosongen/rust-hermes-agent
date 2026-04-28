@@ -22,5 +22,7 @@ pub mod commands;
 pub mod handlers;
 pub mod display;
 pub mod ui;
+pub mod slash_commands;
+pub mod background_tasks;
 
 pub use commands::*;

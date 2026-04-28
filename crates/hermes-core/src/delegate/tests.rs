@@ -47,6 +47,7 @@ fn test_delegate_result_serialization() {
             result_bytes: 1042,
             status: "ok".to_string(),
         }],
+        task_id: Some("test-task".to_string()),
     };
     let json = serde_json::to_string(&result).unwrap();
     assert!(json.contains("\"status\":\"completed\""));
@@ -64,6 +65,7 @@ fn test_batch_delegate_result() {
             model: "gpt-4o".to_string(),
             exit_reason: "completed".to_string(),
             tool_trace: vec![],
+            task_id: Some("task-1".to_string()),
         },
         DelegateResult {
             status: DelegateStatus::Failed,
@@ -73,14 +75,13 @@ fn test_batch_delegate_result() {
             model: "gpt-4o".to_string(),
             exit_reason: "completed".to_string(),
             tool_trace: vec![],
+            task_id: Some("task-2".to_string()),
         },
     ];
-    let batch = BatchDelegateResult {
-        results,
-        total_duration_ms: 800,
-    };
-    let json = serde_json::to_string(&batch).unwrap();
-    assert!(json.contains("\"total_duration_ms\":800"));
+    let batch = BatchDelegateResult::new(results);
+    assert_eq!(batch.success_count, 1);
+    assert_eq!(batch.failed_count, 1);
+    assert_eq!(batch.total_duration_ms, 800);
 }
 
 #[test]

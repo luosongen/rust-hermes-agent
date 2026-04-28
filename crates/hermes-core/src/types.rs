@@ -232,12 +232,16 @@ impl fmt::Display for ModelId {
 // ToolContext
 // =============================================================================
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ToolContext {
     pub session_id: String,
     pub working_directory: PathBuf,
     pub user_id: Option<String>,
     pub task_id: Option<String>,
+    /// YOLO 模式 — 为 true 时跳过危险命令审批检查
+    pub yolo_mode: bool,
+    /// 文件检查点管理器 — 为 Some 时工具在修改文件前自动创建快照
+    pub checkpoint_manager: Option<std::sync::Arc<hermes_checkpoint::CheckpointManager>>,
 }
 
 // =============================================================================

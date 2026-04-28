@@ -514,6 +514,8 @@ mod tests {
             working_directory: PathBuf::from("/tmp"),
             user_id: None,
             task_id: None,
+            yolo_mode: false,
+            checkpoint_manager: None,
         };
         let tool_result: Result<String, hermes_core::ToolError> = {
             let tool: &dyn Tool = &executor;

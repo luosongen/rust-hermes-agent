@@ -15,8 +15,8 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Chat { model, session, no_tools, credentials } => {
-            chat::run_chat(model, session, no_tools, credentials).await?;
+        Commands::Chat { model, session, no_tools, credentials, yolo, fast } => {
+            chat::run_chat(model, session, no_tools, credentials, yolo, fast).await?;
         }
         Commands::Model { command } => {
             match command {

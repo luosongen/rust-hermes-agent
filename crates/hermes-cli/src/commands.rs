@@ -58,6 +58,14 @@ pub enum Commands {
         /// 凭据字符串，格式为 "provider:key,provider2:key2"（启用 RetryingProvider）
         #[arg(long)]
         credentials: Option<String>,
+
+        /// 启用 YOLO 模式（跳过危险命令审批检查）
+        #[arg(long)]
+        yolo: bool,
+
+        /// 启用 Fast 模式（优先级 API 处理）
+        #[arg(long)]
+        fast: bool,
     },
 
     /// 管理 AI 模型（列出可用模型、设置默认模型、查看模型信息）

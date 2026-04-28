@@ -121,6 +121,8 @@ async fn test_tool_dispatcher_dispatch() {
         user_id: None,
         working_directory: std::path::PathBuf::from("."),
         task_id: None,
+        yolo_mode: false,
+        checkpoint_manager: None,
     };
 
     let result = registry.dispatch(&call, context).await;
@@ -142,6 +144,8 @@ async fn test_tool_dispatcher_not_found() {
         user_id: None,
         working_directory: std::path::PathBuf::from("."),
         task_id: None,
+        yolo_mode: false,
+        checkpoint_manager: None,
     };
 
     let result = registry.dispatch(&call, context).await;

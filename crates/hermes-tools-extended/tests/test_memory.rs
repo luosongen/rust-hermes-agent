@@ -15,6 +15,8 @@ fn make_ctx() -> ToolContext {
         working_directory: PathBuf::from("/tmp"),
         user_id: None,
         task_id: None,
+        yolo_mode: false,
+        checkpoint_manager: None,
     }
 }
 

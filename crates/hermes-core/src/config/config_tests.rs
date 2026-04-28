@@ -126,10 +126,12 @@ mod tests {
     fn test_delegation_config_defaults() {
         let config = DelegationConfig::default();
         assert!(!config.enabled);
-        assert_eq!(config.max_depth, 3);
+        assert_eq!(config.max_depth, 2);  // 修改为 2，防止过深递归
         assert_eq!(config.default_model, "openai/gpt-4o");
         assert!(config.default_personality.is_none());
         assert!(config.max_tokens.is_none());
+        assert_eq!(config.max_concurrent, 3);
+        assert_eq!(config.timeout_seconds, 300);
     }
 
     // Display tests

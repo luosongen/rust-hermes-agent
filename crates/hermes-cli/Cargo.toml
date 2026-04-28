@@ -25,4 +25,8 @@ hermes-environment.workspace = true
 hermes-provider = { path = "../hermes-provider" }
 hermes-skills.workspace = true
 hermes-gateway.workspace = true
+hermes-checkpoint.workspace = true
+parking_lot.workspace = true
 axum.workspace = true
+ratatui.workspace = true
+crossterm.workspace = true

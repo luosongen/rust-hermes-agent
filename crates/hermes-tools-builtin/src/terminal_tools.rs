@@ -26,6 +26,7 @@
 //! - 内部使用 `tokio::process::Command` 进行异步进程管理
 
 use async_trait::async_trait;
+use hermes_checkpoint::CheckpointManager;
 use hermes_core::{ToolContext, ToolError};
 use hermes_environment::{Environment, EnvironmentError};
 use serde_json::json;
@@ -92,6 +93,34 @@ impl TerminalTool {
         }
         None
     }
+
+    /// 检测命令是否有破坏性（会修改/删除文件）
+    ///
+    /// 破坏性命令执行前需要自动创建检查点。
+    fn is_destructive(command: &str) -> bool {
+        use regex::Regex;
+
+        let destructive: Vec<Regex> = vec![
+            Regex::new(r"\brm\b").unwrap(),
+            Regex::new(r"\brmdir\b").unwrap(),
+            Regex::new(r"\bmv\b").unwrap(),
+            Regex::new(r"\bcp\b").unwrap(),
+            Regex::new(r"\bdd\b").unwrap(),
+            Regex::new(r"\btee\b").unwrap(),
+            Regex::new(r"\{\s*>").unwrap(),       // 重定向输出（shell 语法）
+            Regex::new(r"\d*>\s*[^>&]").unwrap(), // 输出重定向 > file
+            Regex::new(r"\bgit\s+(reset|clean|checkout)\b").unwrap(),
+            Regex::new(r"\bshred\b").unwrap(),
+            Regex::new(r"\btruncate\b").unwrap(),
+        ];
+
+        for re in &destructive {
+            if re.is_match(command) {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 #[async_trait]
@@ -125,17 +154,27 @@ impl hermes_tool_registry::Tool for TerminalTool {
     async fn execute(
         &self,
         args: serde_json::Value,
-        _context: ToolContext,
+        context: ToolContext,
     ) -> Result<String, ToolError> {
         let command = args["command"]
             .as_str()
             .ok_or_else(|| ToolError::InvalidArgs("command must be string".into()))?;
 
         // Security: auto-check dangerous commands before execution
-        if let Some(reason) = Self::check_dangerous(command) {
-            return Err(ToolError::PermissionDenied(
-                format!("Dangerous command blocked: {}. Reason: {}. Use 'approval' tool if you need to whitelist this command.", command, reason)
-            ));
+        // YOLO 模式下跳过危险命令检查
+        if !context.yolo_mode {
+            if let Some(reason) = Self::check_dangerous(command) {
+                return Err(ToolError::PermissionDenied(
+                    format!("Dangerous command blocked: {}. Reason: {}. Use 'approval' tool if you need to whitelist this command.", command, reason)
+                ));
+            }
+        }
+
+        // 自动检查点：破坏性命令执行前对整个工作目录创建快照
+        if Self::is_destructive(command) {
+            if let Some(cm) = &context.checkpoint_manager {
+                let _ = cm.snapshot_working_dir(&context.working_directory).await;
+            }
         }
 
         let timeout_secs = args["timeout"].as_i64().unwrap_or(30);

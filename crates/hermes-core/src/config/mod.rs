@@ -67,9 +67,11 @@ pub mod delegation;
 pub mod display;
 pub mod mcp;
 pub mod personality;
+pub mod profile;
 pub mod provider;
 pub mod provider_core;
 pub mod provider_custom;
+pub mod safety;
 pub mod stt;
 
 // ============================================================================
@@ -86,7 +88,9 @@ pub use delegation::DelegationConfig;
 pub use display::DisplayConfig;
 pub use mcp::{McpServerConfig, McpServersConfig, McpTransport};
 pub use personality::{PersonalityConfig, PersonalityPreset};
+pub use profile::{Profile, ProfileError, ProfileManager};
 pub use provider::{ProviderModelConfig, ProviderSettings, SmartRouterConfig};
+pub use safety::SafetyConfig;
 pub use provider_core::CoreProvider;
 pub use provider_custom::CustomProviderConfig;
 pub use stt::{SttConfig, SttProviderConfig};
@@ -282,6 +286,8 @@ pub struct Config {
     pub display: DisplayConfig,
     #[serde(default)]
     pub personality: PersonalityConfig,
+    #[serde(default)]
+    pub safety: SafetyConfig,
 }
 
 // ============================================================================
@@ -326,6 +332,7 @@ impl Default for Config {
             delegation: DelegationConfig::default(),
             display: DisplayConfig::default(),
             personality: PersonalityConfig::default(),
+            safety: SafetyConfig::default(),
         }
     }
 }
@@ -400,6 +407,10 @@ impl Config {
         }
         if other.environment.ssh.host.is_some() {
             self.environment.ssh = other.environment.ssh.clone();
+        }
+        // Safety config merge
+        if other.safety != SafetyConfig::default() {
+            self.safety = other.safety;
         }
     }
 
@@ -601,6 +612,13 @@ impl Config {
         if let Ok(val) = std::env::var("HERMES_SSH_PRIVATE_KEY") {
             self.environment.ssh.private_key = Some(PathBuf::from(val));
         }
+        // Safety config
+        if let Ok(val) = std::env::var("HERMES_YOLO_MODE") {
+            self.safety.yolo_mode = val == "1" || val.to_lowercase() == "true";
+        }
+        if let Ok(val) = std::env::var("HERMES_FAST_MODE") {
+            self.safety.fast_mode = val == "1" || val.to_lowercase() == "true";
+        }
     }
 
     /// 通过键获取配置值（支持点号分隔的嵌套键）
@@ -641,6 +659,8 @@ impl Config {
             ["environment", "ssh", "host"] => self.environment.ssh.host.clone(),
             ["environment", "ssh", "user"] => self.environment.ssh.user.clone(),
             ["environment", "ssh", "port"] => Some(self.environment.ssh.port.to_string()),
+            ["safety", "yolo_mode"] => Some(self.safety.yolo_mode.to_string()),
+            ["safety", "fast_mode"] => Some(self.safety.fast_mode.to_string()),
             _ => {
                 if let Some(val) = self.nudge.get(key) {
                     return Some(val);
@@ -702,6 +722,14 @@ impl Config {
             }
             ["environment", "ssh", "port"] => {
                 self.environment.ssh.port = value.parse().unwrap_or(22);
+                true
+            }
+            ["safety", "yolo_mode"] => {
+                self.safety.yolo_mode = value.parse().unwrap_or(false);
+                true
+            }
+            ["safety", "fast_mode"] => {
+                self.safety.fast_mode = value.parse().unwrap_or(false);
                 true
             }
             _ => false,

@@ -67,6 +67,7 @@ pub mod usage_pricing;
 pub mod rate_limit_tracker;
 pub mod context_pressure_monitor;
 pub mod metadata_extractor;
+pub mod safety;
 
 pub use compression::{ToolResultPruner, Summarizer, PRUNED_TOOL_PLACEHOLDER};
 pub use context_pressure_monitor::{ContextPressureMonitor, PressureLevel};
@@ -97,6 +98,7 @@ pub use conversation::*;
 pub use gateway::*;
 pub use hermes_memory::SessionStore;
 pub use nudge::{NudgeConfig, NudgeService, NudgeState, NudgeTrigger, ReviewPrompts};
+pub use hermes_checkpoint::{CheckpointManager, CheckpointEntry, CheckpointError};
 
 #[cfg(test)]
 mod tests;

@@ -98,6 +98,8 @@ impl CronScheduler {
                                             working_directory: std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("/")),
                                             user_id: None,
                                             task_id: None,
+                                            yolo_mode: false,
+                                            checkpoint_manager: None,
                                         };
 
                                         match tool.execute(job_clone.tool_args.clone(), context).await {

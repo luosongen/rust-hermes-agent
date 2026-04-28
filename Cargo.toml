@@ -54,6 +54,7 @@ hermes-platform-email = { path = "crates/hermes-platform-email" }
 hermes-environment = { path = "crates/hermes-environment" }
 hermes-provider = { path = "crates/hermes-provider" }
 hermes-cron = { path = "crates/hermes-cron" }
+hermes-checkpoint = { path = "crates/hermes-checkpoint" }
 serde-xml-rs = "0.6"
 rusqlite = { version = "0.32", features = ["bundled"] }
 sha2 = "0.10"
@@ -70,3 +71,5 @@ scraper = "0.21"
 cron = "0.15"
 urlencoding = "2.1"
 serde_urlencoded = "0.7"
+ratatui = "0.28"
+crossterm = { version = "0.28", features = ["event-stream"] }

@@ -49,6 +49,12 @@ pub mod clarify_tools;
 pub mod approval_tools;
 /// 浏览器自动化工具模块
 pub mod browser_tools;
+/// 文件搜索工具模块
+pub mod search_tools;
+/// 文件补丁工具模块
+pub mod patch_tools;
+/// 网络搜索工具模块
+pub mod web_tools;
 
 pub use file_tools::{ReadFileTool, WriteFileTool};
 pub use skills::{load_skill_registry, load_skill_registry_and_manager, SkillExecuteTool, SkillListTool, SkillSearchTool, SkillManageTool};
@@ -62,6 +68,9 @@ pub use browser_tools::{
     BrowserTypeTool, BrowserScrollTool, BrowserBackTool, BrowserPressTool,
     BrowserVisionTool,
 };
+pub use search_tools::SearchFilesTool;
+pub use patch_tools::PatchTool;
+pub use web_tools::{WebSearchTool, WebSearchConfig, SearchProvider};
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -105,6 +114,9 @@ pub fn register_builtin_tools(registry: &ToolRegistry, environment: Arc<dyn Envi
     registry.register(BrowserPressTool::new(browser_core.clone()));
     registry.register(BrowserVisionTool::new(browser_core.clone()));
     browser_core.start_cleanup();
+    // 文件搜索和补丁工具
+    registry.register(SearchFilesTool::new(environment.clone()));
+    registry.register(PatchTool::new(environment.clone()));
 }
 
 /// 注册技能管理工具

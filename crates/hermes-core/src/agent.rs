@@ -44,6 +44,10 @@ pub struct AgentConfig {
     pub temperature: Option<f32>,
     pub max_tokens: Option<usize>,
     pub working_directory: std::path::PathBuf,
+    /// YOLO 模式 — 跳过危险命令审批检查
+    pub yolo_mode: bool,
+    /// 文件检查点管理器
+    pub checkpoint_manager: Option<std::sync::Arc<hermes_checkpoint::CheckpointManager>>,
 }
 
 impl Default for AgentConfig {
@@ -54,6 +58,8 @@ impl Default for AgentConfig {
             temperature: None,
             max_tokens: None,
             working_directory: std::env::current_dir().unwrap_or_else(|_| ".".into()),
+            yolo_mode: false,
+            checkpoint_manager: None,
         }
     }
 }
@@ -63,7 +69,8 @@ pub struct Agent {
     provider: Arc<dyn LlmProvider>,
     tools: Arc<dyn ToolDispatcher>,
     session_store: Arc<dyn SessionStore>,
-    config: AgentConfig,
+    /// Agent 配置（公开以允许 CLI 层在运行时更新 YOLO/Fast 模式）
+    pub config: AgentConfig,
     // Nudge system
     nudge_service: Arc<NudgeService>,
     nudge_state: Arc<Mutex<NudgeState>>,
@@ -419,6 +426,8 @@ impl Agent {
                                 working_directory: self.config.working_directory.clone(),
                                 user_id: None,
                                 task_id: Some(call.id.clone()),
+                                yolo_mode: self.config.yolo_mode,
+                                checkpoint_manager: self.config.checkpoint_manager.clone(),
                             };
                             let result = self
                                 .tools

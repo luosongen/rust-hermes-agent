@@ -24,12 +24,15 @@
 //! - `hermes_tools_builtin`: `register_builtin_tools`
 
 use anyhow::Result;
+use hermes_checkpoint::CheckpointManager;
 use hermes_core::{
     Agent, AgentConfig, ConversationRequest, DisplayHandler, InMemoryInsightsTracker,
     InsightsTracker, LlmProvider, PoolStrategy, RateLimitTracker, RetryConfig, TitleGenerator,
     TrajectorySaver,
 };
+use crate::background_tasks::BackgroundTaskManager;
 use crate::display::CliDisplay;
+use crate::slash_commands::{self, ReplState, SlashCommand};
 use crate::ui::{
     LineReader,
     StreamingOutput,
@@ -125,6 +128,8 @@ pub async fn run_chat(
     session_id: Option<String>,
     no_tools: bool,
     credentials: Option<String>,
+    yolo: bool,
+    fast: bool,
 ) -> Result<()> {
     // 初始化组件
     // 创建 SQLite 会话存储，使用 Arc 共享
@@ -193,9 +198,20 @@ pub async fn run_chat(
         create_provider_for_model(&model, credentials.as_deref())?
     };
 
+    // 创建检查点管理器
+    let config_dir = hermes_core::config::config_dir();
+    let checkpoint_manager = Some(Arc::new(CheckpointManager::new(
+        config_dir.join("checkpoints"),
+    )));
+
+    // 创建后台任务管理器
+    let background_tasks = Arc::new(BackgroundTaskManager::new());
+
     // 构建 Agent
     let agent_config = AgentConfig {
         model: model.clone(),
+        yolo_mode: yolo,
+        checkpoint_manager: checkpoint_manager.clone(),
         ..Default::default()
     };
     let nudge_config = hermes_core::config::Config::load().map(|c| c.nudge).unwrap_or_default();
@@ -249,8 +265,24 @@ pub async fn run_chat(
         new_id
     };
 
+    // 创建 ReplState
+    let mut repl_state = ReplState {
+        yolo_mode: yolo,
+        fast_mode: fast,
+        session_id: session_id.clone(),
+        model: model.clone(),
+        checkpoint_manager: checkpoint_manager.clone(),
+        config_path: hermes_core::config::config_file(),
+        profile_manager: None, // Profile 管理器稍后初始化
+        token_usage: Default::default(),
+        last_user_input: None,
+    };
+
     println!("[Session: {}] ({})", session_id, model);
-    println!("输入消息后按回车发送。Ctrl+C 退出。\n");
+    println!("输入消息后按回车发送。输入 /help 查看可用命令。\n");
+    if yolo {
+        println!("⚠ YOLO 模式已开启 — 危险命令审批已跳过");
+    }
 
     // 创建 UI 组件
     let loading_animation = StreamingOutput::new();
@@ -259,6 +291,21 @@ pub async fn run_chat(
     let session_id = Arc::new(session_id);
 
     loop {
+        // 1. 检查并打印已完成的 background task 结果
+        let completed = background_tasks.get_completed_and_clear();
+        for task in &completed {
+            match &task.status {
+                crate::background_tasks::TaskStatus::Completed { result } => {
+                    println!("\n[后台任务 {} 完成]\n{}\n", task.id, result);
+                }
+                crate::background_tasks::TaskStatus::Failed { error } => {
+                    eprintln!("\n[后台任务 {} 失败]\n{}\n", task.id, error);
+                }
+                _ => {}
+            }
+        }
+
+        // 2. 读取用户输入
         let line = match line_reader.read_line("> ").await {
             Ok(l) => l,
             Err(_) => break,
@@ -269,13 +316,70 @@ pub async fn run_chat(
             continue;
         }
 
-        // 克隆会话 ID 用于此次请求
+        // 3. Slash 命令 dispatch
+        if line.starts_with('/') {
+            if let Some(cmd) = slash_commands::parse_slash_command(line) {
+                // 处理 background 命令的特殊逻辑
+                if let SlashCommand::Background(ref prompt) = cmd {
+                    if prompt.is_empty() {
+                        println!("用法: /background <提示词> — 在后台异步执行任务");
+                        continue;
+                    }
+                    let task_id = BackgroundTaskManager::generate_id();
+                    let prompt_owned = prompt.clone();
+                    let task_id_for_print = task_id.clone();
+                    background_tasks.register(task_id.clone(), prompt_owned.clone());
+
+                    let bg_tasks = background_tasks.clone();
+                    let bg_agent = agent.clone();
+
+                    tokio::spawn(async move {
+                        let result = {
+                            let mut agent_lock = bg_agent.write().await;
+                            agent_lock.run_conversation(ConversationRequest {
+                                content: prompt_owned,
+                                session_id: Some(format!("bg_{}", task_id)),
+                                system_prompt: None,
+                            }).await
+                        };
+                        match result {
+                            Ok(resp) => bg_tasks.complete(&task_id, resp.content),
+                            Err(e) => bg_tasks.fail(&task_id, e.to_string()),
+                        }
+                    });
+
+                    println!("后台任务 {} 已启动", task_id_for_print);
+                    continue;
+                }
+
+                let result = slash_commands::dispatch_slash_command(cmd, &mut repl_state).await;
+                if !result.message.is_empty() {
+                    println!("{}", result.message);
+                }
+                if result.should_exit {
+                    break;
+                }
+
+                // 如果 YOLO 或 Fast 模式变更了，更新 Agent 的 config
+                {
+                    let mut ag = agent.write().await;
+                    ag.config.yolo_mode = repl_state.yolo_mode;
+                }
+                continue;
+            }
+        }
+
+        // 4. 同步 AgentConfig 的 YOLO 模式
+        {
+            let mut ag = agent.write().await;
+            ag.config.yolo_mode = repl_state.yolo_mode;
+        }
+
+        // 5. 调用 Agent 处理对话
         let sid = (*session_id).clone();
 
-        // 显示加载动画
         loading_animation.start_loading("处理中");
 
-        // 调用 Agent 处理对话
         let response = agent
             .write().await
             .run_conversation(ConversationRequest {
@@ -285,7 +389,6 @@ pub async fn run_chat(
             })
             .await;
 
-        // 停止加载动画
         loading_animation.stop_loading();
 
         match response {
@@ -295,6 +398,11 @@ pub async fn run_chat(
             Err(e) => {
                 eprintln!("[错误] {}\n", e);
             }
+        }
+
+        // 6. 推进检查点回合
+        if let Some(cm) = &repl_state.checkpoint_manager {
+            cm.advance_turn();
         }
     }
 

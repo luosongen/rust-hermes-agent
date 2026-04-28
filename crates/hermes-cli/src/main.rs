@@ -28,6 +28,8 @@ mod handlers;
 mod chat;
 mod display;
 mod ui;
+pub mod slash_commands;
+pub mod background_tasks;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -44,8 +46,10 @@ async fn main() -> anyhow::Result<()> {
             session,
             no_tools,
             credentials,
+            yolo,
+            fast,
         } => {
-            crate::chat::run_chat(model, session, no_tools, credentials).await?;
+            crate::chat::run_chat(model, session, no_tools, credentials, yolo, fast).await?;
         }
         commands::Commands::Model { command } => {
             match command {
