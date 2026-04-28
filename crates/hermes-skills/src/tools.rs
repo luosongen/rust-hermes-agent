@@ -1,51 +1,70 @@
-//! Skills tools - skills_list, skills_view, skills_manage
+//! 技能工具模块 - skills_list, skills_view, skills_manage
 //!
-//! Provides tool functions for skill management:
-//! - `skills_list`: List all skills with metadata
-//! - `skills_view`: View full skill content
-//! - `skills_manage`: CRUD for skill self-improvement
+//! 提供技能管理的工具函数：
+//! - `skills_list`: 列出所有技能及其元数据
+//! - `skills_view`: 查看技能完整内容
+//! - `skills_manage`: 技能自我改进的 CRUD 操作
 
 use crate::error::SkillError;
 use crate::loader::SkillLoader;
 use crate::registry::SkillRegistry;
 use serde::{Deserialize, Serialize};
 
+/// skills_list 工具参数
 #[derive(Debug, Deserialize)]
 pub struct SkillsListArgs {
+    /// 分类筛选（保留用于未来扩展）
     #[allow(dead_code)]
-    pub category: Option<String>, // Reserved for future use
+    pub category: Option<String>,
 }
 
+/// skills_view 工具参数
 #[derive(Debug, Deserialize)]
 pub struct SkillsViewArgs {
+    /// 技能名称
     pub name: String,
+    /// 文件路径（可选）
     pub file_path: Option<String>,
 }
 
+/// skills_manage 工具参数
 #[derive(Debug, Deserialize)]
 pub struct SkillsManageArgs {
-    pub action: String, // "create" | "edit" | "patch" | "delete"
+    /// 操作类型：create | edit | patch | delete
+    pub action: String,
+    /// 技能名称
     pub name: String,
+    /// 完整内容（用于 create/edit）
     pub content: Option<String>,
+    /// 旧字符串（用于 patch）
     pub old_string: Option<String>,
+    /// 新字符串（用于 patch）
     pub new_string: Option<String>,
 }
 
+/// 技能列表项
 #[derive(Debug, Serialize)]
 pub struct SkillListItem {
+    /// 技能名称
     pub name: String,
+    /// 技能描述
     pub description: String,
+    /// 所属分类
     pub category: String,
 }
 
+/// 技能查看结果
 #[derive(Debug, Serialize)]
 pub struct SkillViewResult {
+    /// 技能名称
     pub name: String,
+    /// 技能描述
     pub description: String,
+    /// 技能内容
     pub content: String,
 }
 
-/// Tool: skills_list - List all available skills
+/// 工具：skills_list - 列出所有可用技能
 pub fn skills_list(registry: &SkillRegistry, args: SkillsListArgs) -> Result<Vec<SkillListItem>, SkillError> {
     let skills = registry.list();
     let mut items: Vec<SkillListItem> = skills
@@ -67,7 +86,7 @@ pub fn skills_list(registry: &SkillRegistry, args: SkillsListArgs) -> Result<Vec
     Ok(items)
 }
 
-/// Tool: skills_view - View full skill content
+/// 工具：skills_view - 查看技能完整内容
 pub fn skills_view(registry: &SkillRegistry, args: SkillsViewArgs) -> Result<SkillViewResult, SkillError> {
     let skill = registry
         .get(&args.name)
@@ -80,7 +99,7 @@ pub fn skills_view(registry: &SkillRegistry, args: SkillsViewArgs) -> Result<Ski
     })
 }
 
-/// Tool: skills_manage - CRUD for skill self-improvement
+/// 工具：skills_manage - 技能自我改进的 CRUD 操作
 pub fn skills_manage(
     registry: &mut SkillRegistry,
     skills_dir: &std::path::Path,

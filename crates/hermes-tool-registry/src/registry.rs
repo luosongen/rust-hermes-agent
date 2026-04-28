@@ -29,7 +29,7 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Tool trait — all tools must implement this.
+/// 工具 trait — 所有工具必须实现此接口
 #[async_trait]
 pub trait Tool: Send + Sync {
     fn name(&self) -> &str;
@@ -45,7 +45,7 @@ pub trait Tool: Send + Sync {
     }
 }
 
-/// Manages registered tools and implements ToolDispatcher for use by Agent.
+/// 工具注册表，管理已注册的工具并实现 ToolDispatcher trait 供 Agent 使用
 pub struct ToolRegistry {
     tools: RwLock<HashMap<String, Arc<dyn Tool>>>,
 }

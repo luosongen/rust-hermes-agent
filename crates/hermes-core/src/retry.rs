@@ -21,16 +21,18 @@
 
 use std::time::Duration;
 
-/// Configuration for retry behavior with exponential backoff.
+/// 重试策略配置
+///
+/// 使用指数退避算法计算重试延迟。
 #[derive(Debug, Clone)]
 pub struct RetryPolicy {
-    /// Maximum number of retry attempts (not including the initial call).
+    /// 最大重试次数（不包含初始调用）
     pub max_retries: u32,
-    /// Base delay before first retry.
+    /// 首次重试的基础延迟
     pub base_delay: Duration,
-    /// Maximum delay cap.
+    /// 延迟上限
     pub max_delay: Duration,
-    /// Enable full jitter (randomize entire delay).
+    /// 是否使用完全随机抖动
     pub full_jitter: bool,
 }
 
@@ -46,6 +48,7 @@ impl Default for RetryPolicy {
 }
 
 impl RetryPolicy {
+    /// 创建新的重试策略
     pub fn new(max_retries: u32, base_delay: Duration, max_delay: Duration) -> Self {
         Self {
             max_retries,
@@ -55,7 +58,7 @@ impl RetryPolicy {
         }
     }
 
-    /// Calculate the delay for a given attempt number (0-indexed).
+    /// 计算指定尝试次数的重试延迟（0-indexed）
     pub fn delay(&self, attempt: u32) -> Duration {
         let exp = 2u32.saturating_pow(attempt);
         let delay_ms = self.base_delay.as_millis() * exp as u128;

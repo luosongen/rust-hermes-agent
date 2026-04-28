@@ -1,3 +1,7 @@
+//! 安装器模块
+//!
+//! 提供技能安装、卸载能力
+
 use chrono::Utc;
 use sha2::{Sha256, Digest};
 use std::path::PathBuf;
@@ -39,14 +43,22 @@ fn parse_frontmatter(content: &str) -> (crate::hub::types::Metadata, &str) {
     (crate::hub::types::Metadata::default(), content.trim())
 }
 
+/// 技能安装器
+///
+/// 负责从市场或 Git 仓库安装技能
 pub struct Installer {
+    /// 技能索引
     index: SkillIndex,
+    /// 市场客户端
     market: MarketClient,
+    /// 安全扫描器
     scanner: SecurityScanner,
+    /// 技能目录
     pub skills_dir: PathBuf,
 }
 
 impl Installer {
+    /// 创建安装器
     pub fn new(
         index: SkillIndex,
         market: MarketClient,
@@ -60,6 +72,7 @@ impl Installer {
         }
     }
 
+    /// 从市场安装技能
     pub async fn install_from_market(
         &self,
         category: &str,
@@ -121,6 +134,7 @@ impl Installer {
         Ok(entry)
     }
 
+    /// 从 Git 仓库安装技能
     pub async fn install_from_git(
         &self,
         git_url: &str,
@@ -227,6 +241,7 @@ impl Installer {
             .ok_or_else(|| HubError::InstallFailed("No skills installed".to_string()))
     }
 
+    /// 卸载技能
     pub fn uninstall(&self, id: &str) -> Result<(), HubError> {
         // Get skill entry
         let entry = self.index.get_skill(id)?

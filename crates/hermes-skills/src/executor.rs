@@ -52,9 +52,13 @@ impl SkillExecution {
 /// 单个步骤
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Step {
+    /// 任务索引
     pub task_idx: usize,
+    /// 步骤索引
     pub step_idx: usize,
+    /// 任务名称
     pub task_name: String,
+    /// 步骤内容
     pub content: String,
 }
 
@@ -97,6 +101,8 @@ pub fn parse_steps(content: &str) -> Vec<Step> {
 }
 
 /// 技能执行器
+///
+/// 负责跟踪技能执行状态，解析步骤并管理执行进度
 pub struct SkillExecutor {
     registry: Arc<RwLock<SkillRegistry>>,
 }

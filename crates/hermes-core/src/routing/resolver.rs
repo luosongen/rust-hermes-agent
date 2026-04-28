@@ -1,19 +1,32 @@
+//! 智能路由解析器
+//!
+//! 根据消息复杂度自动选择合适的模型。
+
 use crate::config::SmartRouterConfig;
 use super::detector::ComplexityDetector;
 
 /// 路由解析结果
 #[derive(Debug, Clone)]
 pub struct RouteResolution {
+    /// 模型名称
     pub model: Option<String>,
+    /// 提供者名称
     pub provider: String,
+    /// 自定义 API 基础 URL
     pub base_url: Option<String>,
+    /// API 密钥
     pub api_key: Option<String>,
+    /// 路由标签
     pub label: Option<String>,
 }
 
-/// 智能路由器 - 根据消息复杂度选择模型
+/// 智能路由器
+///
+/// 根据消息复杂度自动选择合适的模型，降低成本。
 pub struct SmartRouter {
+    /// 路由配置
     config: SmartRouterConfig,
+    /// 复杂度检测器
     detector: ComplexityDetector,
 }
 
@@ -57,7 +70,7 @@ impl SmartRouter {
 
     /// 解析路由决策
     ///
-    /// 如果消息简单且启用廉价模型，返回廉价路由；否则返回 None
+    /// 如果消息简单且启用廉价模型，返回廉价路由；否则返回 None。
     pub fn resolve_route(&self, message: &str) -> Option<RouteResolution> {
         self.choose_cheap_model_route(message)
     }

@@ -1,8 +1,13 @@
-//! FuzzyPatch - Fuzzy string matching for skill self-improvement
+//! FuzzyPatch - 模糊字符串匹配模块
+//!
+//! 用于技能自我改进时的模糊字符串替换，支持空白字符灵活匹配
 
 use fuzzy_matcher::FuzzyMatcher;
 use fuzzy_matcher::skim::SkimMatcherV2;
 
+/// 模糊补丁工具
+///
+/// 提供模糊字符串匹配和替换能力，支持不精确的字符串匹配
 pub struct FuzzyPatch {
     matcher: SkimMatcherV2,
 }
@@ -20,14 +25,16 @@ impl Default for FuzzyPatch {
 }
 
 impl FuzzyPatch {
+    /// 创建新的模糊补丁实例
     pub fn new() -> Self {
         Self {
             matcher: SkimMatcherV2::default(),
         }
     }
 
-    /// Find the best match for `old_string` in `content`
-    /// Returns (score, start_index, end_index)
+    /// 在 content 中查找 old_string 的最佳匹配
+    ///
+    /// 返回 (分数, 起始索引, 结束索引)
     pub fn find_match(&self, content: &str, old_string: &str) -> Option<(i64, usize, usize)> {
         let score = self.matcher.fuzzy_match(content, old_string)?;
         // Find actual positions by searching after fuzzy match
@@ -40,7 +47,9 @@ impl FuzzyPatch {
         Some((score, 0, content.len()))
     }
 
-    /// Replace old_string with new_string in content, handling whitespace flexibility
+    /// 在 content 中用 new_string 替换 old_string
+    ///
+    /// 支持空白字符的灵活匹配
     pub fn patch(&self, content: &str, old_string: &str, new_string: &str) -> Result<String, String> {
         let (score, start, end) = self.find_match(content, old_string)
             .ok_or_else(|| "Could not find matching content to patch".to_string())?;
@@ -54,7 +63,7 @@ impl FuzzyPatch {
         Ok(result)
     }
 
-    /// Preview patch without applying it
+    /// 预览补丁效果（不实际应用）
     pub fn preview(&self, content: &str, old_string: &str, new_string: &str) -> Option<String> {
         let (score, start, end) = self.find_match(content, old_string)?;
         if score < 0 {

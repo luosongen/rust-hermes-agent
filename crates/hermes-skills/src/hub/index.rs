@@ -1,3 +1,7 @@
+//! 技能索引模块
+//!
+//! 使用 SQLite 存储技能索引信息
+
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, Result as SqliteResult};
 use std::path::PathBuf;
@@ -7,12 +11,17 @@ use parking_lot::Mutex;
 use crate::hub::error::HubError;
 use crate::hub::types::{Category, SkillIndexEntry, SkillSource};
 
+/// 技能索引
+///
+/// 使用 SQLite 数据库存储技能索引信息
 #[derive(Clone)]
 pub struct SkillIndex {
+    /// 数据库连接
     pub conn: Arc<Mutex<Connection>>,
 }
 
 impl SkillIndex {
+    /// 创建技能索引
     pub fn new(db_path: PathBuf) -> Result<Self, HubError> {
         let conn = Connection::open(&db_path)?;
         let index = Self {
@@ -22,6 +31,7 @@ impl SkillIndex {
         Ok(index)
     }
 
+    /// 初始化数据库表结构
     pub fn init_schema(&self) -> Result<(), HubError> {
         let conn = self.conn.lock();
 
@@ -79,6 +89,7 @@ impl SkillIndex {
         Ok(())
     }
 
+    /// 添加技能到索引
     pub fn add_skill(&self, entry: &SkillIndexEntry) -> Result<(), HubError> {
         let conn = self.conn.lock();
 
@@ -112,6 +123,7 @@ impl SkillIndex {
         Ok(())
     }
 
+    /// 根据 ID 获取技能
     pub fn get_skill(&self, id: &str) -> Result<Option<SkillIndexEntry>, HubError> {
         let conn = self.conn.lock();
 
@@ -130,6 +142,7 @@ impl SkillIndex {
         }
     }
 
+    /// 列出所有技能
     pub fn list_skills(&self) -> Result<Vec<SkillIndexEntry>, HubError> {
         let conn = self.conn.lock();
 
@@ -149,6 +162,7 @@ impl SkillIndex {
         Ok(entries)
     }
 
+    /// 按分类列出技能
     pub fn list_skills_by_category(&self, category: &str) -> Result<Vec<SkillIndexEntry>, HubError> {
         let conn = self.conn.lock();
 
@@ -168,12 +182,14 @@ impl SkillIndex {
         Ok(entries)
     }
 
+    /// 从索引中移除技能
     pub fn remove_skill(&self, id: &str) -> Result<(), HubError> {
         let conn = self.conn.lock();
         conn.execute("DELETE FROM skills WHERE id = ?1", params![id])?;
         Ok(())
     }
 
+    /// 获取所有分类
     pub fn get_categories(&self) -> Result<Vec<Category>, HubError> {
         let conn = self.conn.lock();
 
@@ -205,6 +221,7 @@ impl SkillIndex {
         Ok(categories)
     }
 
+    /// 添加分类
     pub fn add_category(&self, cat: &Category) -> Result<(), HubError> {
         let conn = self.conn.lock();
 
@@ -222,6 +239,7 @@ impl SkillIndex {
         Ok(())
     }
 
+    /// 将数据库行转换为技能条目
     fn row_to_entry(&self, row: &rusqlite::Row) -> SqliteResult<SkillIndexEntry> {
         let source_type: String = row.get(5)?;
         let source_url: Option<String> = row.get(6)?;

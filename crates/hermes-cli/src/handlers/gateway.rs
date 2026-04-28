@@ -1,13 +1,13 @@
-//! Gateway commands implementation
+//! 网关命令处理器
 //!
-//! Provides commands for starting, stopping, and checking status of the HTTP gateway.
+//! 提供 HTTP 网关的启动、停止和状态检查命令。
 
 use anyhow::Result;
 use hermes_core::config::Config;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
-/// Display gateway configuration status
+/// 显示网关配置状态
 pub async fn gateway_status() -> Result<()> {
     let config = Config::load()?;
     let gateway = &config.gateway;
@@ -79,7 +79,7 @@ pub async fn gateway_status() -> Result<()> {
     Ok(())
 }
 
-/// Start the gateway server
+/// 启动网关服务器
 pub async fn start_gateway(port: u16) -> Result<()> {
     use hermes_core::Agent;
     use hermes_memory::SqliteSessionStore;
@@ -95,7 +95,7 @@ pub async fn start_gateway(port: u16) -> Result<()> {
     use hermes_core::RetryConfig;
     use crate::display::CliDisplay;
 
-    // Initialize components
+    // 初始化各组件
     let db_path = PathBuf::from("./hermes.db");
     let session_store: Arc<dyn hermes_core::SessionStore> = Arc::new(SqliteSessionStore::new(db_path).await?);
     let tool_registry = Arc::new(ToolRegistry::new()) as Arc<dyn ToolDispatcher>;
@@ -109,7 +109,7 @@ pub async fn start_gateway(port: u16) -> Result<()> {
 
     let provider: Arc<dyn LlmProvider> = Arc::new(OpenAiProvider::new(api_key, None));
 
-    // Gateway uses CliDisplay for HTTP webhook handling
+    // 网关使用 CliDisplay 处理 HTTP webhook
     let display_handler: Option<Arc<dyn DisplayHandler>> = Some(Arc::new(CliDisplay::new()));
     let title_generator: Option<Arc<TitleGenerator>> = Some(Arc::new(TitleGenerator::with_default_model(provider.clone())));
     let trajectory_saver: Option<TrajectorySaver> = Some(TrajectorySaver::default());
@@ -140,7 +140,7 @@ pub async fn start_gateway(port: u16) -> Result<()> {
     Ok(())
 }
 
-/// Print setup instructions for the gateway
+/// 打印网关设置说明
 pub fn setup_gateway() -> Result<()> {
     println!("Gateway Setup Instructions:");
     println!();
@@ -193,7 +193,7 @@ pub fn setup_gateway() -> Result<()> {
     Ok(())
 }
 
-/// Print stop instructions for the gateway
+/// 打印网关停止说明
 pub fn stop_gateway() -> Result<()> {
     println!("To stop the gateway:");
     println!();

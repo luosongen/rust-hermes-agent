@@ -1,42 +1,42 @@
-//! ContextPressureMonitor — Tiered context pressure monitoring
+//! ContextPressureMonitor — 分层上下文压力监控
 //!
-//! Monitors context window usage and provides warnings at different thresholds:
-//! - Normal (0-50%): No action needed
-//! - Moderate (50-75%): Consider preparing for compression
-//! - High (75-90%): Compression recommended
-//! - Critical (90%+): Compression will occur soon
+//! 监控上下文窗口使用率并在不同阈值提供警告：
+//! - Normal (0-50%): 无需操作
+//! - Moderate (50-75%): 考虑准备压缩
+//! - High (75-90%): 建议压缩
+//! - Critical (90%+): 即将触发压缩
 
 use serde::{Deserialize, Serialize};
 
-/// Pressure level enum
+/// 压力级别枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PressureLevel {
-    /// Below moderate threshold
+    /// 低于中等阈值
     Normal,
-    /// 50-75% of context used
+    /// 已使用 50-75% 上下文
     Moderate,
-    /// 75-90% of context used
+    /// 已使用 75-90% 上下文
     High,
-    /// 90%+ of context used
+    /// 已使用 90%+ 上下文
     Critical,
 }
 
-/// Context pressure monitor
+/// 上下文压力监控器
 ///
-/// Monitors context window usage and provides tiered warnings.
+/// 监控上下文窗口使用率并提供分层警告。
 pub struct ContextPressureMonitor {
-    /// Total context window size
+    /// 上下文窗口总大小
     context_length: usize,
-    /// Moderate threshold (default: 50%)
+    /// 中等阈值（默认：50%）
     moderate_threshold: usize,
-    /// High threshold (default: 75%)
+    /// 高阈值（默认：75%）
     high_threshold: usize,
-    /// Critical threshold (default: 90%)
+    /// 临界阈值（默认：90%）
     critical_threshold: usize,
 }
 
 impl ContextPressureMonitor {
-    /// Create monitor with default thresholds (50%, 75%, 90%)
+    /// 创建使用默认阈值（50%、75%、90%）的监控器
     pub fn new(context_length: usize) -> Self {
         Self {
             context_length,
@@ -46,7 +46,7 @@ impl ContextPressureMonitor {
         }
     }
 
-    /// Create monitor with custom moderate and high thresholds
+    /// 创建使用自定义中等和高阈值的监控器
     pub fn with_custom_thresholds(context_length: usize, moderate: usize, high: usize) -> Self {
         Self {
             context_length,
@@ -56,7 +56,7 @@ impl ContextPressureMonitor {
         }
     }
 
-    /// Get current pressure level based on token count
+    /// 根据 token 数量获取当前压力级别
     pub fn get_pressure_level(&self, current_tokens: usize) -> PressureLevel {
         let ratio = current_tokens as f64 / self.context_length as f64;
         if ratio >= 0.90 {
@@ -70,7 +70,7 @@ impl ContextPressureMonitor {
         }
     }
 
-    /// Get warning message for current pressure level
+    /// 获取当前压力级别的警告消息
     pub fn get_warning_message(&self, current_tokens: usize) -> String {
         let level = self.get_pressure_level(current_tokens);
         let percentage = (current_tokens as f64 / self.context_length as f64 * 100.0) as usize;
@@ -78,41 +78,41 @@ impl ContextPressureMonitor {
         match level {
             PressureLevel::Normal => String::new(),
             PressureLevel::Moderate => format!(
-                "Context at {}% — Consider preparing to compress if conversation gets longer.",
+                "上下文使用率 {}% — 如果对话继续延长，请考虑准备压缩。",
                 percentage
             ),
             PressureLevel::High => format!(
-                "High context pressure ({}%) — Compression recommended.",
+                "高上下文压力 ({}%) — 建议压缩。",
                 percentage
             ),
             PressureLevel::Critical => format!(
-                "Critical context pressure ({}%) — Compression will occur soon.",
+                "临界上下文压力 ({}%) — 即将触发压缩。",
                 percentage
             ),
         }
     }
 
-    /// Check if compression should be triggered proactively
+    /// 检查是否应主动触发压缩
     pub fn should_compress(&self, current_tokens: usize) -> bool {
         self.get_pressure_level(current_tokens) == PressureLevel::Critical
     }
 
-    /// Get current usage ratio (0.0 to 1.0+)
+    /// 获取当前使用率（0.0 到 1.0+）
     pub fn usage_ratio(&self, current_tokens: usize) -> f64 {
         current_tokens as f64 / self.context_length as f64
     }
 
-    /// Get the moderate threshold value
+    /// 获取中等阈值
     pub fn moderate_threshold(&self) -> usize {
         self.moderate_threshold
     }
 
-    /// Get the high threshold value
+    /// 获取高阈值
     pub fn high_threshold(&self) -> usize {
         self.high_threshold
     }
 
-    /// Get the critical threshold value
+    /// 获取临界阈值
     pub fn critical_threshold(&self) -> usize {
         self.critical_threshold
     }

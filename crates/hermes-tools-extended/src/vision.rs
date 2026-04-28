@@ -10,13 +10,17 @@ use serde_json::json;
 use std::sync::Arc;
 
 // ============================================================================
-// VisionProvider enum — all supported vision backends
+// VisionProvider enum — 所有支持的视觉后端
 // ============================================================================
 
+/// 视觉分析提供商枚举
 #[derive(Clone)]
 pub enum VisionProvider {
+    /// 使用 LlmProvider trait 的通用实现
     Llm(LlmVisionProvider),
+    /// Anthropic Claude Vision
     Anthropic(AnthropicVisionProvider),
+    /// OpenAI GPT-4V
     OpenAi(OpenAIVisionProvider),
 }
 

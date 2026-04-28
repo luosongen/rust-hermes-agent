@@ -33,7 +33,9 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Built-in skill execution tool with step-by-step execution support.
+/// 技能执行工具，支持逐步执行技能
+///
+/// 提供技能的启动、继续、完成和状态查询功能。
 pub struct SkillExecuteTool {
     registry: Arc<RwLock<SkillRegistry>>,
     executor: Arc<SkillExecutor>,
@@ -157,9 +159,10 @@ impl hermes_tool_registry::Tool for SkillExecuteTool {
     }
 }
 
-/// Built-in skill list tool.
+/// 技能列表工具
 ///
-/// Usage from agent: `skill_list()`
+/// 列出所有已注册的技能名称。
+/// Agent 调用方式：`skill_list()`
 pub struct SkillListTool {
     registry: Arc<RwLock<SkillRegistry>>,
 }
@@ -201,9 +204,10 @@ impl hermes_tool_registry::Tool for SkillListTool {
     }
 }
 
-/// Built-in skill search tool.
+/// 技能搜索工具
 ///
-/// Usage from agent: `skill_search(query="search term")`
+/// 按名称或描述搜索已注册的技能。
+/// Agent 调用方式：`skill_search(query="搜索关键词")`
 pub struct SkillSearchTool {
     registry: Arc<RwLock<SkillRegistry>>,
 }
@@ -262,7 +266,9 @@ impl hermes_tool_registry::Tool for SkillSearchTool {
     }
 }
 
-/// Initialize skill registry by loading skills from default directories.
+/// 初始化技能注册表，从默认目录加载所有技能
+///
+/// 返回可在多个工具间共享的注册表引用。
 pub fn load_skill_registry() -> Arc<RwLock<SkillRegistry>> {
     let loader = SkillLoader::new(SkillLoader::default_dirs());
     let skills = loader.load_all().unwrap_or_default();
@@ -278,9 +284,10 @@ pub fn load_skill_registry() -> Arc<RwLock<SkillRegistry>> {
 
 use hermes_skills::manager::SkillManager;
 
-/// Built-in skill management tool.
+/// 技能管理工具
 ///
-/// Usage from agent: `skill_manage(action="create", name="my-skill", content="...")`
+/// 提供技能的创建、编辑、补丁、删除、写入文件和删除文件功能。
+/// Agent 调用方式：`skill_manage(action="create", name="my-skill", content="...")`
 pub struct SkillManageTool {
     manager: Arc<RwLock<SkillManager>>,
 }
@@ -418,7 +425,9 @@ impl hermes_tool_registry::Tool for SkillManageTool {
     }
 }
 
-/// Initialize skill registry and skill manager by loading skills from default directories.
+/// 初始化技能注册表和管理器，从默认目录加载技能
+///
+/// 返回三元组：(注册表, 管理器, 执行器)
 pub fn load_skill_registry_and_manager() -> (Arc<RwLock<SkillRegistry>>, Arc<RwLock<SkillManager>>, Arc<SkillExecutor>) {
     let loader = SkillLoader::new(SkillLoader::default_dirs());
     let skills = loader.load_all().unwrap_or_default();

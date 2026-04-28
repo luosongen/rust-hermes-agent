@@ -21,28 +21,30 @@
 use crate::{ChatRequest, ChatResponse, ModelId, ProviderError, StreamingCallback};
 use async_trait::async_trait;
 
-/// Trait implemented by all LLM provider backends.
+/// LLM Provider trait — 所有 LLM 后端的统一接口
+///
+/// 实现此 trait 以支持新的 LLM 提供者。
 #[async_trait]
 pub trait LlmProvider: Send + Sync {
-    /// Provider name (e.g. "openai", "anthropic")
+    /// 返回提供者名称（如 "openai"、"anthropic"）
     fn name(&self) -> &str;
 
-    /// List of models this provider supports
+    /// 返回该提供者支持的模型列表
     fn supported_models(&self) -> Vec<ModelId>;
 
-    /// Non-streaming chat completion
+    /// 非流式聊天完成
     async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, ProviderError>;
 
-    /// Streaming chat completion
+    /// 流式聊天完成
     async fn chat_streaming(
         &self,
         request: ChatRequest,
         callback: StreamingCallback,
     ) -> Result<ChatResponse, ProviderError>;
 
-    /// Rough token count estimate
+    /// 估算文本的 token 数量
     fn estimate_tokens(&self, text: &str, model: &ModelId) -> usize;
 
-    /// Context window for the given model
+    /// 获取指定模型的上下文窗口大小
     fn context_length(&self, model: &ModelId) -> Option<usize>;
 }

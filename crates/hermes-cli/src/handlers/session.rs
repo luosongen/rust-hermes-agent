@@ -1,9 +1,11 @@
-//! Session command handlers
+//! 会话命令处理器
+//!
+//! 提供 `session` 子命令的处理函数：列出、查看、搜索、删除会话。
 
 use anyhow::Result;
 use hermes_memory::{SessionStore, SqliteSessionStore};
 
-/// Handle `session list` command
+/// 处理 `session list` 命令，列出所有会话
 pub async fn list_sessions() -> Result<()> {
     let store = SqliteSessionStore::new("hermes.db".into()).await?;
     let sessions = store.list_sessions(50, 0).await?;
@@ -27,7 +29,7 @@ pub async fn list_sessions() -> Result<()> {
     Ok(())
 }
 
-/// Handle `session show` command
+/// 处理 `session show` 命令，显示会话详情
 pub async fn show_session(id: &str) -> Result<()> {
     let store = SqliteSessionStore::new("hermes.db".into()).await?;
     let session = store.get_session(id).await?;
@@ -51,7 +53,7 @@ pub async fn show_session(id: &str) -> Result<()> {
     Ok(())
 }
 
-/// Handle `session search` command
+/// 处理 `session search` 命令，搜索会话内容
 pub async fn search_sessions(query: &str) -> Result<()> {
     let store = SqliteSessionStore::new("hermes.db".into()).await?;
     let results = store.search_messages(query, 20).await?;
@@ -68,7 +70,7 @@ pub async fn search_sessions(query: &str) -> Result<()> {
     Ok(())
 }
 
-/// Handle `session delete` command
+/// 处理 `session delete` 命令，删除指定会话
 pub async fn delete_session(id: &str) -> Result<()> {
     let store = SqliteSessionStore::new("hermes.db".into()).await?;
     store.delete_session(id).await?;

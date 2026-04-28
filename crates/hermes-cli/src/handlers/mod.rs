@@ -1,6 +1,6 @@
-//! Command handlers module
+//! 命令处理器模块
 //!
-//! Each subcommand has its own file with handler functions.
+//! 每个子命令都有独立的文件包含相应的处理函数。
 
 pub mod model;
 pub mod session;

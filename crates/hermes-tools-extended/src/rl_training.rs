@@ -13,66 +13,106 @@ use tokio::process::Command;
 const RL_TRAINING_DIR: &str = ".config/hermes-agent/rl_training";
 const TRAIN_SCRIPT: &str = "launch_training.py";
 
+/// 训练配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrainingConfig {
+    /// 模型名称或路径
     pub model: String,
+    /// 数据集路径
     pub dataset: String,
+    /// 训练轮数
     #[serde(default)]
     pub epochs: Option<u32>,
+    /// 批大小
     #[serde(default)]
     pub batch_size: Option<u32>,
+    /// 学习率
     #[serde(default)]
     pub learning_rate: Option<f64>,
+    /// 输出目录
     #[serde(default)]
     pub output_dir: Option<String>,
+    /// 额外参数
     #[serde(default)]
     pub extra_args: std::collections::HashMap<String, String>,
 }
 
+/// 训练状态枚举
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TrainingState {
+    /// 等待中
     Pending,
+    /// 启动中
     Starting,
+    /// 运行中
     Running,
+    /// 已完成
     Completed,
+    /// 已失败
     Failed,
+    /// 已取消
     Cancelled,
 }
 
+/// 训练进度
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Progress {
+    /// 当前轮次
     pub current_epoch: u32,
+    /// 总轮次
     pub total_epochs: u32,
+    /// 当前损失值
     pub loss: Option<f64>,
+    /// 其他指标
     pub metrics: std::collections::HashMap<String, f64>,
 }
 
+/// 训练状态详情
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrainingStatus {
+    /// 训练任务 ID
     pub id: String,
+    /// 模型名称
     pub model: String,
+    /// 数据集路径
     pub dataset: String,
+    /// 当前状态
     pub state: TrainingState,
+    /// 启动时间戳
     pub started_at: f64,
+    /// 更新时间戳
     pub updated_at: f64,
+    /// 训练进度
     pub progress: Option<Progress>,
+    /// 错误信息
     pub error: Option<String>,
 }
 
+/// 训练结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrainingResult {
+    /// 训练任务 ID
     pub id: String,
+    /// 模型输出路径
     pub model_path: String,
+    /// 最终损失值
     pub final_loss: Option<f64>,
+    /// 评估指标
     pub metrics: std::collections::HashMap<String, f64>,
+    /// 完成时间戳
     pub completed_at: f64,
+    /// 训练耗时（秒）
     pub duration_secs: u64,
 }
 
+/// RLTrainingTool — 强化学习训练工具
 #[derive(Clone)]
 pub struct RLTrainingTool {
+    /// 训练任务存储目录
     training_dir: PathBuf,
+    /// tinker-atropos 路径
     tinker_atropos_path: PathBuf,
+    /// Python 解释器路径
     python_path: PathBuf,
 }
 

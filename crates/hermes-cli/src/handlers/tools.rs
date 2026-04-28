@@ -1,6 +1,6 @@
-//! Tools commands implementation
+//! 工具命令处理器
 //!
-//! Provides commands for listing, enabling, and disabling tools.
+//! 提供工具的列出、启用和禁用命令。
 
 use anyhow::Result;
 use hermes_core::config::Config;
@@ -9,7 +9,7 @@ use hermes_tool_registry::ToolRegistry;
 use hermes_tools_builtin::register_builtin_tools;
 use std::sync::Arc;
 
-/// List all registered tools
+/// 列出所有已注册的工具
 pub fn list_tools() -> Result<()> {
     let registry = Arc::new(ToolRegistry::new());
     let environment = Arc::new(LocalEnvironment::new("."));
@@ -23,7 +23,7 @@ pub fn list_tools() -> Result<()> {
     Ok(())
 }
 
-/// Enable a tool in config
+/// 在配置中启用指定工具
 pub fn enable_tool(tool: &str) -> Result<()> {
     let mut config = Config::load()?;
     let key = format!("tools.{}.enabled", tool);
@@ -36,7 +36,7 @@ pub fn enable_tool(tool: &str) -> Result<()> {
     Ok(())
 }
 
-/// Disable a tool in config
+/// 在配置中禁用指定工具
 pub fn disable_tool(tool: &str) -> Result<()> {
     let mut config = Config::load()?;
     let key = format!("tools.{}.enabled", tool);

@@ -1,12 +1,12 @@
-//! Skills command handlers
+//! 技能命令处理器
 //!
-//! Provides handlers for the `skills` subcommand: list, search, install, uninstall.
+//! 提供 `skills` 子命令的处理函数：列出、搜索、安装、卸载技能。
 
 use anyhow::Result;
 use hermes_skills::{SkillLoader, SkillRegistry};
 use std::path::PathBuf;
 
-/// Default skills directory: `~/.hermes/skills`
+/// 获取默认技能目录：`~/.hermes/skills`
 fn default_skills_dir() -> PathBuf {
     dirs::data_dir()
         .unwrap_or_else(|| PathBuf::from("."))
@@ -14,7 +14,7 @@ fn default_skills_dir() -> PathBuf {
         .join("skills")
 }
 
-/// Load the skill registry from the default skills directory.
+/// 从默认技能目录加载技能注册表
 fn load_registry() -> Result<SkillRegistry, hermes_skills::SkillError> {
     let loader = SkillLoader::new(vec![default_skills_dir()]);
     let skills = loader.load_all()?;
@@ -25,7 +25,7 @@ fn load_registry() -> Result<SkillRegistry, hermes_skills::SkillError> {
     Ok(registry)
 }
 
-/// List all installed skills.
+/// 列出所有已安装的技能
 pub fn list_skills() -> Result<()> {
     let registry = load_registry()?;
     let names = registry.names();
@@ -42,7 +42,7 @@ pub fn list_skills() -> Result<()> {
     Ok(())
 }
 
-/// Search skills by name or description.
+/// 按名称或描述搜索技能
 pub fn search_skills(query: &str) -> Result<()> {
     let registry = load_registry()?;
     let results = registry.search(query);
@@ -57,7 +57,7 @@ pub fn search_skills(query: &str) -> Result<()> {
     Ok(())
 }
 
-/// Install a skill from a source (stub).
+/// 从指定来源安装技能（存根实现）
 pub fn install_skill(skill_source: &str) -> Result<()> {
     println!(
         "Install skill from '{}' (not yet implemented).",
@@ -67,7 +67,7 @@ pub fn install_skill(skill_source: &str) -> Result<()> {
     Ok(())
 }
 
-/// Uninstall a skill by removing its directory.
+/// 通过移除目录卸载技能
 pub fn uninstall_skill(skill_name: &str) -> Result<()> {
     let skills_dir = default_skills_dir();
     let skill_path = skills_dir.join(skill_name);

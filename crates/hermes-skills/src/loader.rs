@@ -41,29 +41,32 @@ use regex::Regex;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// A loaded skill with parsed content.
+/// 已加载的技能，包含解析后的内容
 #[derive(Debug, Clone)]
 pub struct Skill {
+    /// 解析后的元数据
     pub metadata: SkillMetadata,
-    /// The full body text after frontmatter (markdown content).
+    /// frontmatter 之后的正文内容（Markdown 格式）
     pub content: String,
-    /// Code blocks extracted from the skill body.
+    /// 从正文中提取的代码块列表
     pub code_blocks: Vec<CodeBlock>,
-    /// Examples extracted from the skill body.
+    /// 从正文中提取的示例列表
     pub examples: Vec<String>,
-    /// Absolute path to the skill file.
+    /// 技能文件的绝对路径
     pub path: PathBuf,
 }
 
-/// A code block extracted from a skill.
+/// 从技能正文中提取的代码块
 #[derive(Debug, Clone)]
 pub struct CodeBlock {
+    /// 代码语言（如 rust、python）
     pub lang: Option<String>,
+    /// 代码内容
     pub code: String,
 }
 
 impl Skill {
-    /// Parse frontmatter from skill file content.
+    /// 从技能文件内容解析 frontmatter
     fn parse_frontmatter(raw: &str) -> Result<(String, String), SkillError> {
         let trimmed = raw.trim_start();
         if !trimmed.starts_with("---") {
@@ -82,7 +85,7 @@ impl Skill {
         Ok((frontmatter.to_string(), body))
     }
 
-    /// Load and parse a single skill file.
+    /// 从文件路径加载并解析单个技能
     pub fn from_path(path: &Path) -> Result<Self, SkillError> {
         let raw = fs::read_to_string(path)?;
         let (frontmatter, body) = Self::parse_frontmatter(&raw)?;
@@ -118,17 +121,18 @@ impl Skill {
     }
 }
 
-/// Loads skills from local directories.
+/// 技能加载器，从本地目录加载技能
 pub struct SkillLoader {
     dirs: Vec<PathBuf>,
 }
 
 impl SkillLoader {
+    /// 创建指定目录的技能加载器
     pub fn new(dirs: Vec<PathBuf>) -> Self {
         Self { dirs }
     }
 
-    /// Load all skills from all configured directories.
+    /// 从所有配置的目录加载技能
     pub fn load_all(&self) -> Result<Vec<Skill>, SkillError> {
         let mut skills = Vec::new();
         for dir in &self.dirs {
@@ -137,7 +141,7 @@ impl SkillLoader {
         Ok(skills)
     }
 
-    /// Load all skills from a single directory (non-recursive).
+    /// 从单个目录加载所有技能（非递归）
     pub fn load_from_dir(&self, dir: &Path) -> Result<Vec<Skill>, SkillError> {
         if !dir.exists() {
             return Ok(Vec::new());
@@ -158,7 +162,7 @@ impl SkillLoader {
         Ok(skills)
     }
 
-    /// Get the default skills directories (~/.hermes/skills, ./skills).
+    /// 获取默认技能目录（~/.hermes/skills, ./skills）
     pub fn default_dirs() -> Vec<PathBuf> {
         let mut dirs = Vec::new();
         if let Some(home) = dirs::home_dir() {
@@ -173,8 +177,9 @@ impl SkillLoader {
         dirs
     }
 
-    /// Parse skill content without writing to disk.
-    /// Used by skills_manage tool to create skills from content strings.
+    /// 解析技能内容（不写入磁盘）
+    ///
+    /// 供 skills_manage 工具从内容字符串创建技能时使用
     pub fn parse_skill_content(name: &str, content: &str) -> Result<Skill, SkillError> {
         // Prepend minimal frontmatter if content doesn't have it
         let full_content = if content.trim().starts_with("---") {

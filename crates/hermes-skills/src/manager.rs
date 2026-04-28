@@ -365,43 +365,66 @@ impl SkillManager {
     }
 }
 
+/// 创建技能的结果
 #[derive(serde::Serialize)]
 pub struct CreateResult {
+    /// 是否成功
     pub success: bool,
+    /// 结果消息
     pub message: String,
+    /// 技能路径
     pub path: String,
+    /// 所属分类（可选）
     pub category: Option<String>,
 }
 
+/// 编辑技能的结果
 #[derive(serde::Serialize)]
 pub struct EditResult {
+    /// 是否成功
     pub success: bool,
+    /// 结果消息
     pub message: String,
+    /// 技能路径
     pub path: String,
 }
 
+/// 补丁修改的结果
 #[derive(serde::Serialize)]
 pub struct PatchResult {
+    /// 是否成功
     pub success: bool,
+    /// 结果消息
     pub message: String,
+    /// 匹配次数
     pub match_count: usize,
 }
 
+/// 删除技能的结果
 #[derive(serde::Serialize)]
 pub struct DeleteResult {
+    /// 是否成功
     pub success: bool,
+    /// 结果消息
     pub message: String,
 }
 
+/// 写入文件的结果
 #[derive(serde::Serialize)]
 pub struct WriteFileResult {
+    /// 是否成功
     pub success: bool,
+    /// 结果消息
     pub message: String,
+    /// 文件路径
     pub path: String,
 }
 
+/// 删除文件的结果
 #[derive(serde::Serialize)]
 pub struct RemoveFileResult {
+    /// 是否成功
     pub success: bool,
+    /// 结果消息
     pub message: String,
 }

@@ -1,18 +1,34 @@
-//! Nudge System — Background memory/skill review for Hermes Agent
+//! Nudge System — 后台记忆/技能审查系统
+//!
+//! 本模块实现了定期触发后台审查的机制，用于提醒 Agent 保存记忆或更新技能。
+//!
+//! ## 主要类型
+//! - **NudgeTrigger**: 触发类型枚举（无/记忆/技能/两者）
+//! - **NudgeConfig**: Nudge 配置（审查间隔）
+//! - **NudgeState**: Nudge 状态追踪
+//! - **NudgeService**: Nudge 服务核心逻辑
 
 use serde::{Deserialize, Serialize};
 
+/// Nudge 触发类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NudgeTrigger {
+    /// 不触发
     None,
+    /// 触发记忆审查
     Memory,
+    /// 触发技能审查
     Skill,
+    /// 同时触发记忆和技能审查
     Both,
 }
 
+/// Nudge 配置
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NudgeConfig {
+    /// 记忆审查间隔（对话轮数）
     pub memory_interval: usize,
+    /// 技能审查间隔（工具调用次数）
     pub skill_interval: usize,
 }
 
@@ -26,6 +42,7 @@ impl Default for NudgeConfig {
 }
 
 impl NudgeConfig {
+    /// 创建禁用的配置
     pub fn disabled() -> Self {
         Self {
             memory_interval: 0,
@@ -33,6 +50,7 @@ impl NudgeConfig {
         }
     }
 
+    /// 获取配置值
     pub fn get(&self, key: &str) -> Option<String> {
         match key {
             "memory_interval" => Some(self.memory_interval.to_string()),
@@ -42,9 +60,12 @@ impl NudgeConfig {
     }
 }
 
+/// Nudge 状态追踪
 #[derive(Debug, Clone)]
 pub struct NudgeState {
+    /// 距离上次记忆审查的对话轮数
     pub turns_since_memory: usize,
+    /// 距离上次技能审查的工具调用次数
     pub iters_since_skill: usize,
 }
 
@@ -57,9 +78,11 @@ impl Default for NudgeState {
     }
 }
 
+/// 审查提示词常量
 pub struct ReviewPrompts;
 
 impl ReviewPrompts {
+    /// 记忆审查提示词
     pub const MEMORY_REVIEW: &'static str = concat!(
         "Review the conversation above and consider saving to memory if appropriate.\n",
         "Focus on:\n",
@@ -71,6 +94,7 @@ impl ReviewPrompts {
         "If nothing is worth saving, just say 'Nothing to save.' and stop."
     );
 
+    /// 技能审查提示词
     pub const SKILL_REVIEW: &'static str = concat!(
         "Review the conversation above and consider saving or updating a skill if appropriate.\n\n",
         "Focus on: was a non-trivial approach used to complete a task that required trial ",
@@ -81,6 +105,7 @@ impl ReviewPrompts {
         "If nothing is worth saving, just say 'Nothing to save.' and stop."
     );
 
+    /// 组合审查提示词（记忆 + 技能）
     pub const COMBINED_REVIEW: &'static str = concat!(
         "Review the conversation above and consider two things:\n\n",
         "**Memory**: Has the user revealed things about themselves — their persona, ",
@@ -95,16 +120,21 @@ impl ReviewPrompts {
     );
 }
 
+/// Nudge 服务
+///
+/// 负责检查触发条件并提供审查提示词。
 #[derive(Debug, Clone)]
 pub struct NudgeService {
     config: NudgeConfig,
 }
 
 impl NudgeService {
+    /// 创建新的 Nudge 服务
     pub fn new(config: NudgeConfig) -> Self {
         Self { config }
     }
 
+    /// 检查是否应触发审查
     pub fn check_triggers(
         &self,
         state: &mut NudgeState,
@@ -135,6 +165,7 @@ impl NudgeService {
         }
     }
 
+    /// 获取对应触发类型的审查提示词
     pub fn get_prompt(&self, trigger: NudgeTrigger) -> &'static str {
         match trigger {
             NudgeTrigger::Memory => ReviewPrompts::MEMORY_REVIEW,

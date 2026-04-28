@@ -5,8 +5,10 @@
 use std::collections::HashSet;
 use regex::Regex;
 
+/// URL 正则表达式
 const URL_REGEX: &str = r"https?://|www\.";
 
+/// 复杂关键词列表
 pub const COMPLEX_KEYWORDS: &[&str] = &[
     "debug", "debugging", "implement", "implementation",
     "refactor", "patch", "traceback", "stacktrace",
@@ -21,17 +23,26 @@ pub const COMPLEX_KEYWORDS: &[&str] = &[
 /// 复杂度检测结果
 #[derive(Debug, Clone)]
 pub struct ComplexityResult {
+    /// 是否为简单消息
     pub is_simple: bool,
+    /// 置信度
     pub confidence: f32,
 }
 
 /// 复杂度检测器
+///
+/// 通过多种启发式规则判断消息复杂度。
 #[derive(Debug, Clone)]
 pub struct ComplexityDetector {
+    /// 复杂关键词集合
     complex_keywords: HashSet<&'static str>,
+    /// 简单消息的最大字符数
     max_simple_chars: usize,
+    /// 简单消息的最大单词数
     max_simple_words: usize,
+    /// 简单消息的最大换行数
     max_newlines: usize,
+    /// URL 匹配正则
     url_regex: Regex,
 }
 

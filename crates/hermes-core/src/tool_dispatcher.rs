@@ -21,13 +21,14 @@
 use crate::{ToolCall, ToolContext, ToolDefinition, ToolError};
 use async_trait::async_trait;
 
-/// Abstraction over the tool registry so hermes-core's Agent does not need
-/// to depend on hermes-tool-registry (which already depends on hermes-core).
+/// 工具调度器 trait
+///
+/// 工具注册的抽象接口，打破 hermes-core 与 hermes-tool-registry 之间的循环依赖。
 #[async_trait]
 pub trait ToolDispatcher: Send + Sync {
-    /// Return tool definitions to send to the LLM.
+    /// 返回要发送给 LLM 的工具定义列表
     fn get_definitions(&self) -> Vec<ToolDefinition>;
 
-    /// Execute a tool call and return its string output.
+    /// 执行工具调用并返回字符串结果
     async fn dispatch(&self, call: &ToolCall, context: ToolContext) -> Result<String, ToolError>;
 }

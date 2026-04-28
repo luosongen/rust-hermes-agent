@@ -16,29 +16,40 @@ use uuid::Uuid;
 /// Session 超时时间（秒）
 const INACTIVITY_TIMEOUT_SECS: u64 = 300;
 
+/// agent-browser CLI 返回的响应结构
 #[derive(Debug, Deserialize)]
 struct BrowserResponse {
+    /// 操作是否成功
     success: bool,
+    /// 返回的数据
     #[serde(default)]
     data: serde_json::Value,
+    /// 错误信息
     #[serde(default)]
     error: Option<String>,
 }
 
-/// 浏览器会话
+/// 浏览器会话，保存单个浏览器实例的状态
 #[derive(Debug, Clone)]
 pub struct BrowserSession {
+    /// 会话名称（唯一标识）
     pub session_name: String,
+    /// 关联的任务 ID
     pub task_id: String,
+    /// socket 通信目录
     pub socket_dir: PathBuf,
+    /// 会话创建时间戳
     pub created_at: f64,
+    /// 最后活动时间戳
     pub last_activity: f64,
 }
 
-/// 会话存储
+/// 浏览器会话存储，管理所有活跃的浏览器会话
 #[derive(Debug, Default)]
 pub struct BrowserSessionStore {
+    /// 会话名称到会话的映射
     sessions: HashMap<String, BrowserSession>,
+    /// 任务 ID 到会话名称的映射
     task_session_map: HashMap<String, String>,
 }
 
@@ -108,7 +119,7 @@ impl BrowserSessionStore {
         }
     }
 
-    /// Force-set last_activity of a session to a given Unix timestamp (for testing stale detection).
+    /// 设置会话的最后活动时间（用于测试过期检测）
     pub fn set_session_last_activity(&mut self, task_id: &str, time: f64) {
         let session_name = self.task_session_map.get(task_id);
         if let Some(name) = session_name {
@@ -119,6 +130,7 @@ impl BrowserSessionStore {
     }
 }
 
+/// 获取当前时间的 Unix 时间戳（秒）
 fn now() -> f64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -126,8 +138,9 @@ fn now() -> f64 {
         .unwrap_or(0.0)
 }
 
-/// BrowserToolCore — 共享浏览器核心逻辑（供所有 browser 工具使用）
+/// 浏览器工具核心，提供共享的浏览器会话管理和命令执行逻辑
 pub struct BrowserToolCore {
+    /// 会话存储
     pub store: Arc<RwLock<BrowserSessionStore>>,
     config_dir: PathBuf,
 }
@@ -188,7 +201,7 @@ impl Clone for BrowserToolCore {
 }
 
 impl BrowserToolCore {
-    /// Execute an agent-browser command.
+    /// 执行 agent-browser 命令
     pub async fn run_command(
         &self,
         task_id: &str,
@@ -251,6 +264,7 @@ impl BrowserToolCore {
 
 // === browser_navigate ===
 
+/// 浏览器导航工具，用于打开指定 URL
 pub struct BrowserNavigateTool {
     pub core: BrowserToolCore,
 }
@@ -273,9 +287,11 @@ impl std::fmt::Debug for BrowserNavigateTool {
     }
 }
 
+/// 导航参数
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NavigateParams {
+    /// 目标 URL
     pub url: String,
 }
 
@@ -316,6 +332,7 @@ impl Tool for BrowserNavigateTool {
 
 // === browser_snapshot ===
 
+/// 浏览器快照工具，获取页面的无障碍树快照
 pub struct BrowserSnapshotTool {
     pub core: BrowserToolCore,
 }
@@ -338,9 +355,11 @@ impl std::fmt::Debug for BrowserSnapshotTool {
     }
 }
 
+/// 快照参数
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SnapshotParams {
+    /// 是否获取完整快照（默认为精简版）
     #[serde(default)]
     pub full: bool,
 }
@@ -383,6 +402,7 @@ impl Tool for BrowserSnapshotTool {
 
 // === browser_click ===
 
+/// 浏览器点击工具，通过 ref ID 点击页面元素
 pub struct BrowserClickTool {
     pub core: BrowserToolCore,
 }
@@ -405,9 +425,11 @@ impl std::fmt::Debug for BrowserClickTool {
     }
 }
 
+/// 点击参数
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClickParams {
+    /// 元素引用 ID
     pub r#ref: String,
 }
 
@@ -444,6 +466,7 @@ impl Tool for BrowserClickTool {
 
 // === browser_type ===
 
+/// 浏览器输入工具，在指定输入框中输入文本
 pub struct BrowserTypeTool {
     pub core: BrowserToolCore,
 }
@@ -466,10 +489,13 @@ impl std::fmt::Debug for BrowserTypeTool {
     }
 }
 
+/// 输入参数
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TypeParams {
+    /// 输入框元素引用 ID
     pub r#ref: String,
+    /// 要输入的文本
     pub text: String,
 }
 
@@ -507,6 +533,7 @@ impl Tool for BrowserTypeTool {
 
 // === browser_scroll ===
 
+/// 浏览器滚动工具，控制页面上滚或下滚
 pub struct BrowserScrollTool {
     pub core: BrowserToolCore,
 }
@@ -529,9 +556,11 @@ impl std::fmt::Debug for BrowserScrollTool {
     }
 }
 
+/// 滚动参数
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScrollParams {
+    /// 滚动方向：up 或 down
     pub direction: String,
 }
 
@@ -570,6 +599,7 @@ impl Tool for BrowserScrollTool {
 
 // === browser_back ===
 
+/// 浏览器后退工具，返回上一页
 pub struct BrowserBackTool {
     pub core: BrowserToolCore,
 }
@@ -616,6 +646,7 @@ impl Tool for BrowserBackTool {
 
 // === browser_press ===
 
+/// 浏览器按键工具，模拟键盘按键
 pub struct BrowserPressTool {
     pub core: BrowserToolCore,
 }
@@ -638,16 +669,21 @@ impl std::fmt::Debug for BrowserPressTool {
     }
 }
 
+/// 按键参数
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PressParams {
+    /// 要按下的键
     pub key: String,
 }
 
+/// 视觉分析参数
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VisionParams {
+    /// 对截图的问题
     pub question: String,
+    /// 是否在截图上添加标注
     #[serde(default)]
     pub annotate: bool,
 }
@@ -681,6 +717,7 @@ impl Tool for BrowserPressTool {
 
 // === browser_vision ===
 
+/// 浏览器视觉工具，截取屏幕截图并进行视觉 AI 分析
 pub struct BrowserVisionTool {
     pub core: BrowserToolCore,
 }

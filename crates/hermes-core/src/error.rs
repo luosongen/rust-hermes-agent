@@ -21,40 +21,57 @@
 pub use hermes_error::StorageError;
 use thiserror::Error;
 
+/// Agent 错误类型
+///
+/// Agent 主循环中可能发生的所有错误类型的汇总。
 #[derive(Error, Debug)]
 pub enum AgentError {
+    /// LLM Provider 错误
     #[error("Provider error: {0}")]
     Provider(#[from] ProviderError),
+    /// 工具执行错误
     #[error("Tool error: {0}")]
     Tool(#[from] ToolError),
+    /// 存储错误
     #[error("Storage error: {0}")]
     Storage(#[from] StorageError),
+    /// 会话错误
     #[error("Session error: {0}")]
     Session(#[from] SessionError),
+    /// 平台适配器错误
     #[error("Platform error: {0}")]
     Platform(#[from] PlatformError),
+    /// 内部错误
     #[error("Internal error: {0}")]
     Internal(String),
+    /// 迭代次数耗尽
     #[error("Iteration budget exhausted")]
     IterationExhausted,
+    /// 内容被过滤
     #[error("Content was filtered")]
     ContentFiltered,
+    /// 未知的结束原因
     #[error("Unknown finish reason")]
     UnknownFinishReason,
+    /// 认证失败
     #[error("Authentication failed")]
     AuthenticationFailed,
+    /// 计费错误
     #[error("Billing error: {0}")]
     BillingError(String),
+    /// 配置错误
     #[error("Configuration error: {0}")]
     ConfigurationError(String),
+    /// 超时错误
     #[error("Timeout error: {0}")]
     TimeoutError(String),
+    /// 网络错误
     #[error("Network error: {0}")]
     NetworkError(String),
 }
 
 impl AgentError {
-    /// Returns true if this error is transient and worth retrying.
+    /// 判断错误是否可重试（瞬态错误）
     pub fn is_retryable(&self) -> bool {
         match self {
             AgentError::Provider(err) => err.is_retryable(),
@@ -64,7 +81,7 @@ impl AgentError {
         }
     }
 
-    /// Returns the suggested retry-after seconds, if known.
+    /// 获取建议的重试等待秒数（仅限流错误有值）
     pub fn retry_after_secs(&self) -> Option<u64> {
         match self {
             AgentError::Provider(err) => err.retry_after_secs(),
@@ -73,24 +90,33 @@ impl AgentError {
     }
 }
 
+/// Provider 错误类型
+///
+/// LLM Provider 调用中可能发生的错误。
 #[derive(Error, Debug)]
 pub enum ProviderError {
+    /// API 错误
     #[error("API error: {0}")]
     Api(String),
+    /// 认证失败
     #[error("Authentication failed")]
     Auth,
+    /// 限流错误（包含建议的重试等待秒数）
     #[error("Rate limited, retry after {0}s")]
     RateLimit(u64),
+    /// 上下文长度超限
     #[error("Context length exceeded")]
     ContextTooLarge,
+    /// 无效模型
     #[error("Invalid model: {0}")]
     InvalidModel(String),
+    /// 网络错误
     #[error("Network error: {0}")]
     Network(#[from] reqwest::Error),
 }
 
 impl ProviderError {
-    /// Returns true if this error is transient and worth retrying.
+    /// 判断错误是否可重试
     pub fn is_retryable(&self) -> bool {
         match self {
             ProviderError::RateLimit(_) => true,
@@ -102,7 +128,7 @@ impl ProviderError {
         }
     }
 
-    /// Returns the suggested retry-after seconds, if known.
+    /// 获取建议的重试等待秒数
     pub fn retry_after_secs(&self) -> Option<u64> {
         match self {
             ProviderError::RateLimit(s) => Some(*s),
@@ -111,44 +137,62 @@ impl ProviderError {
     }
 }
 
+/// 工具执行错误类型
 #[derive(Error, Debug)]
 pub enum ToolError {
+    /// 执行失败
     #[error("Execution failed: {0}")]
     Execution(String),
+    /// 参数无效
     #[error("Invalid arguments: {0}")]
     InvalidArgs(String),
+    /// 缺少必需的环境变量
     #[error("Missing required environment: {0}")]
     MissingEnv(String),
+    /// 权限拒绝
     #[error("Permission denied: {0}")]
     PermissionDenied(String),
+    /// 未找到
     #[error("Not found: {0}")]
     NotFound(String),
+    /// 超时
     #[error("Timeout: {0}")]
     Timeout(String),
 }
 
+/// 会话错误类型
 #[derive(Error, Debug)]
 pub enum SessionError {
+    /// 会话不存在
     #[error("Session not found: {0}")]
     NotFound(String),
+    /// 会话已过期
     #[error("Session expired")]
     Expired,
+    /// 会话数据损坏
     #[error("Session corrupted: {0}")]
     Corrupted(String),
 }
 
+/// 平台适配器错误类型
 #[derive(Error, Debug)]
 pub enum PlatformError {
+    /// 连接失败
     #[error("Connection failed: {0}")]
     Connection(String),
+    /// 认证失败
     #[error("Authentication failed")]
     Auth,
+    /// 限流
     #[error("Rate limited")]
     RateLimit,
+    /// 消息格式无效
     #[error("Invalid message format: {0}")]
     InvalidFormat(String),
+    /// Webhook 验证失败
     #[error("Webhook verification failed")]
     WebhookVerificationFailed,
+    /// 消息未找到
     #[error("Message not found: {0}")]
     MessageNotFound(String),
 }

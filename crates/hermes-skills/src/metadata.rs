@@ -31,44 +31,56 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Configuration item defined in skill frontmatter.
+/// 技能配置项，定义在 YAML frontmatter 中
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillConfigItem {
+    /// 配置项键名
     pub key: String,
+    /// 配置项描述
     pub description: String,
+    /// 默认值（可选）
     #[serde(default)]
     pub default: Option<String>,
 }
 
-/// Hermes-specific metadata inside the YAML frontmatter.
+/// Hermes 特定元数据，嵌套在 YAML frontmatter 的 metadata 字段中
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HermesMetadata {
+    /// 技能版本号
     #[serde(default)]
     pub version: Option<String>,
+    /// 配置项列表
     #[serde(default)]
     pub config: Vec<SkillConfigItem>,
+    /// 所需工具集列表
     #[serde(default)]
     pub requires_toolsets: Vec<String>,
 }
 
-/// The YAML frontmatter of a skill file.
+/// 技能 YAML frontmatter 元数据
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillMetadata {
+    /// 技能名称（唯一标识）
     pub name: String,
+    /// 技能描述
     pub description: String,
+    /// 支持的平台列表（如 cli、gateway）
     #[serde(default)]
     pub platforms: Vec<String>,
+    /// Hermes 特定元数据
     #[serde(default)]
     pub metadata: HermesMetadata,
 }
 
 impl SkillMetadata {
-    /// Returns true if this skill supports the given platform.
+    /// 检查技能是否支持指定平台
+    ///
+    /// 如果 platforms 为空，则默认支持所有平台
     pub fn supports_platform(&self, platform: &str) -> bool {
         self.platforms.is_empty() || self.platforms.iter().any(|p| p == platform)
     }
 
-    /// Returns true if the skill requires the given toolset.
+    /// 检查技能是否需要指定工具集
     pub fn requires_toolset(&self, toolset: &str) -> bool {
         self.metadata
             .requires_toolsets

@@ -1,6 +1,11 @@
+//! 对话摘要生成器
+//!
+//! 使用 LLM 生成对话的结构化摘要，用于上下文压缩。
+
 use crate::{ChatRequest, Content, LlmProvider, Message, ModelId, Role};
 use std::sync::Arc;
 
+/// 摘要生成提示词模板
 const SUMMARY_TEMPLATE: &str = r#"You are a context summarizer. Given a conversation, create a structured summary.
 
 ## Summary Structure
@@ -14,17 +19,26 @@ const SUMMARY_TEMPLATE: &str = r#"You are a context summarizer. Given a conversa
 - Preserve important decisions and outcomes
 "#;
 
-/// LLM-based conversation summarizer for context compression
+/// 对话摘要生成器
+///
+/// 使用 LLM 将对话压缩为结构化摘要。
 pub struct Summarizer {
+    /// LLM Provider
     llm: Arc<dyn LlmProvider>,
+    /// 摘要模型名称
     summary_model: Option<String>,
 }
 
 impl Summarizer {
+    /// 创建新的摘要生成器
     pub fn new(llm: Arc<dyn LlmProvider>, summary_model: Option<String>) -> Self {
         Self { llm, summary_model }
     }
 
+    /// 生成对话摘要
+    ///
+    /// `messages` — 要摘要的对话消息
+    /// `budget_tokens` — 摘要的 token 预算
     pub async fn summarize(
         &self,
         messages: Vec<Message>,

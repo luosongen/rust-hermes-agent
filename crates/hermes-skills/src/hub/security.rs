@@ -1,43 +1,65 @@
+//! Hub 安全扫描模块
+//!
+//! 提供技能内容的安全扫描能力
+
 use regex::Regex;
 use std::time::Instant;
 
-/// Security threat detected during scanning
+/// 安全威胁
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SecurityThreat {
+    /// 规则 ID
     pub rule_id: String,
+    /// 威胁类型
     pub threat_type: ThreatType,
+    /// 严重程度
     pub severity: Severity,
+    /// 威胁描述
     pub description: String,
+    /// 位置（行号等）
     pub location: Option<String>,
 }
 
-/// Type of security threat
+/// 威胁类型
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub enum ThreatType {
+    /// 危险命令
     DangerousCommand,
+    /// 网络调用
     NetworkCall,
+    /// 文件访问
     FileAccess,
+    /// 环境变量泄露
     EnvLeak,
+    /// 可疑模式
     SuspiciousPattern,
 }
 
-/// Severity level of a security threat
+/// 严重程度
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq, Ord, PartialOrd)]
 pub enum Severity {
+    /// 低
     Low,
+    /// 中
     Medium,
+    /// 高
     High,
+    /// 严重
     Critical,
 }
 
-/// Result of a security scan
+/// 安全扫描结果
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SecurityScanResult {
+    /// 是否通过（无威胁）
     pub passed: bool,
+    /// 检测到的威胁列表
     pub threats: Vec<SecurityThreat>,
+    /// 扫描耗时（毫秒）
     pub scan_duration_ms: u64,
 }
 
+/// 扫描规则
 struct ScanRule {
     id: &'static str,
     pattern: Regex,
@@ -46,11 +68,15 @@ struct ScanRule {
     description: &'static str,
 }
 
+/// 安全扫描器
+///
+/// 使用预定义规则扫描技能内容中的安全威胁
 pub struct SecurityScanner {
     rules: Vec<ScanRule>,
 }
 
 impl SecurityScanner {
+    /// 创建安全扫描器
     pub fn new() -> Self {
         let rules = vec![
             // Dangerous command rules
@@ -146,10 +172,12 @@ impl SecurityScanner {
         Self { rules }
     }
 
+    /// 扫描内容
     pub fn scan(&self, content: &str) -> SecurityScanResult {
         self.scan_with_force(content, false)
     }
 
+    /// 扫描内容（可强制跳过检查）
     pub fn scan_with_force(&self, content: &str, _force: bool) -> SecurityScanResult {
         let start = Instant::now();
         let mut threats = Vec::new();

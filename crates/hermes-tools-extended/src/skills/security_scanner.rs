@@ -1,28 +1,51 @@
+//! SecurityScanner — Skills 安全扫描器
+//!
+//! 检测 Skill 内容中的潜在安全威胁，包括代码执行、敏感操作等危险模式。
+
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
+/// 威胁检测结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Threat {
+    /// 匹配的危险模式名称
     pub pattern: String,
+    /// 威胁所在行号
     pub line_number: usize,
+    /// 威胁严重程度
     pub severity: Severity,
 }
 
+/// 威胁严重程度枚举
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Severity {
+    /// 高危：可能导致代码执行
     High,
+    /// 中危：可能导致敏感信息泄露
     Medium,
+    /// 低危：潜在风险
     Low,
 }
 
+/// 扫描结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScanResult {
+    /// 是否安全（无威胁）
     pub safe: bool,
+    /// 检测到的威胁列表
     pub threats: Vec<Threat>,
+    /// 已扫描内容数量
     #[serde(default)]
     pub scanned_count: usize,
 }
 
+/// 扫描内容，检测潜在安全威胁
+///
+/// # 参数
+/// - `content`: 待扫描的文本内容
+///
+/// # 返回
+/// 返回扫描结果，包含是否安全及检测到的威胁列表
 pub fn scan_content(content: &str) -> ScanResult {
     let patterns: Vec<(&str, &str, Severity)> = vec![
         (r"eval\s*\(", "eval() code execution", Severity::High),

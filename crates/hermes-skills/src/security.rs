@@ -1,10 +1,11 @@
-//! Security scanner for skill content
-//! Ports patterns from Python skills_guard.py
+//! 技能内容安全扫描模块
+//!
+//! 从 Python skills_guard.py 移植的安全模式匹配规则
 
 use regex::Regex;
 use once_cell::sync::Lazy;
 
-// Security patterns
+/// 数据渗漏模式：检测环境变量泄露等风险
 static EXFIL_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
         Regex::new(r"\$(ENV|env|ENV_VAR|HERMES_[A-Z_]+)").unwrap(),
@@ -12,6 +13,7 @@ static EXFIL_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     ]
 });
 
+/// 提示注入模式：检测忽略指令等攻击模式
 static INJECTION_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
         Regex::new(r"(?i)ignore[_\s]+previous").unwrap(),
@@ -22,6 +24,7 @@ static INJECTION_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     ]
 });
 
+/// 破坏性命令模式：检测危险的系统命令
 static DESTRUCTIVE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
         Regex::new(r"rm\s+-rf\s+/").unwrap(),
@@ -31,6 +34,7 @@ static DESTRUCTIVE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     ]
 });
 
+/// 持久化模式：检测 crontab、systemd 等持久化机制
 static PERSISTENCE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
         Regex::new(r"crontab\s+-").unwrap(),
@@ -40,6 +44,7 @@ static PERSISTENCE_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     ]
 });
 
+/// 网络模式：检测反弹 shell 等网络攻击
 static NETWORK_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
         Regex::new(r"nc\s+-[el]").unwrap(),
@@ -49,6 +54,7 @@ static NETWORK_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     ]
 });
 
+/// 混淆模式：检测 base64、eval 等代码混淆
 static OBFUSCATION_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
         Regex::new(r"base64\s+-d").unwrap(),
@@ -57,6 +63,7 @@ static OBFUSCATION_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     ]
 });
 
+/// 凭据模式：检测 API key、私钥等敏感信息
 static CREDENTIAL_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
         Regex::new(r#"(?i)(api[_-]?key|secret|token|password)\s*=\s*['"][A-Za-z0-9+/=_-]{20,}['"]"#).unwrap(),
@@ -64,21 +71,27 @@ static CREDENTIAL_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     ]
 });
 
-/// Security scan result
+/// 安全扫描结果
 #[derive(Debug, Clone)]
 pub struct SecurityScanResult {
+    /// 是否安全（无威胁）
     pub safe: bool,
+    /// 检测到的威胁列表
     pub threats: Vec<SecurityThreat>,
 }
 
+/// 安全威胁
 #[derive(Debug, Clone)]
 pub struct SecurityThreat {
+    /// 威胁类型
     pub pattern_type: String,
+    /// 匹配的内容
     pub matched: String,
+    /// 行号（可选）
     pub line_number: Option<usize>,
 }
 
-/// Scan content for security threats
+/// 扫描内容中的安全威胁
 pub fn scan_content(content: &str) -> SecurityScanResult {
     let mut threats = Vec::new();
     let lines: Vec<&str> = content.lines().collect();

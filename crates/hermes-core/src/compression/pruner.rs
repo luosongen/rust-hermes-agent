@@ -1,13 +1,24 @@
+//! 工具结果剪枝器
+//!
+//! 将旧的工具调用结果替换为占位符，以节省上下文空间。
+
 use crate::{Content, Message, Role};
 
+/// 剪枝后的工具结果占位符
 pub const PRUNED_TOOL_PLACEHOLDER: &str = "[Old tool output cleared to save context space]";
 
+/// 工具结果剪枝器
+///
+/// 将旧的工具调用结果替换为占位符，保留消息结构。
 pub struct ToolResultPruner {
+    /// 保护的尾部 token 数量
     protect_tail_tokens: Option<usize>,
+    /// 保护的尾部消息数量
     protect_tail_count: usize,
 }
 
 impl ToolResultPruner {
+    /// 创建新的剪枝器
     pub fn new(protect_tail_count: usize, protect_tail_tokens: Option<usize>) -> Self {
         Self {
             protect_tail_tokens,
@@ -15,6 +26,7 @@ impl ToolResultPruner {
         }
     }
 
+    /// 执行剪枝操作
     pub fn prune(&self, messages: Vec<Message>) -> Vec<Message> {
         let mut result = Vec::with_capacity(messages.len());
 

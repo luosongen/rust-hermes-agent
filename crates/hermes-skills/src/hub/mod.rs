@@ -1,3 +1,7 @@
+//! Hub 模块 - 技能市场和管理
+//!
+//! 提供技能市场的浏览、搜索、同步和安装功能
+
 pub mod browse;
 pub mod error;
 pub mod index;
@@ -18,16 +22,26 @@ pub use types::*;
 
 use std::path::PathBuf;
 
+/// Hub 客户端
+///
+/// 整合技能索引、市场客户端、浏览、同步和安装功能
 pub struct HubClient {
+    /// 技能索引
     pub index: SkillIndex,
+    /// 市场客户端
     pub market: MarketClient,
+    /// 浏览功能
     pub browse: Browse,
+    /// 同步功能
     pub sync: Sync,
+    /// 安装功能
     pub installer: Installer,
+    /// Hub 配置
     pub config: HubConfig,
 }
 
 impl HubClient {
+    /// 创建 Hub 客户端
     pub fn new(home_dir: PathBuf) -> Result<Self, HubError> {
         let config = HubConfig::default();
         let skills_dir = home_dir.join("skills");
@@ -51,6 +65,7 @@ impl HubClient {
         })
     }
 
+    /// 获取技能目录路径
     pub fn skills_dir(&self) -> PathBuf {
         self.installer.skills_dir.clone()
     }

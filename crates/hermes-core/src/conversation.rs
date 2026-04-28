@@ -13,18 +13,28 @@
 
 use crate::Usage;
 
-/// Conversation request
+/// 会话请求
+///
+/// 用户发起的对话请求，包含消息内容、可选的会话 ID 和系统提示词。
 #[derive(Debug, Clone)]
 pub struct ConversationRequest {
+    /// 用户输入的内容
     pub content: String,
+    /// 会话 ID（用于关联历史消息）
     pub session_id: Option<String>,
+    /// 自定义系统提示词
     pub system_prompt: Option<String>,
 }
 
-/// Conversation response
+/// 会话响应
+///
+/// Agent 返回的对话响应，包含生成的内容、会话 ID 和 token 使用量。
 #[derive(Debug, Clone)]
 pub struct ConversationResponse {
+    /// Agent 生成的内容
     pub content: String,
+    /// 会话 ID
     pub session_id: Option<String>,
+    /// Token 使用量统计
     pub usage: Option<Usage>,
 }

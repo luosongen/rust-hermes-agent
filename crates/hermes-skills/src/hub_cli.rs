@@ -1,84 +1,92 @@
+//! Hub CLI 命令行接口模块
+//!
+//! 提供 skill hub 的命令行操作，包括浏览、搜索、安装、更新和卸载技能
+
 use clap::{Parser, Subcommand};
 use crate::hub::{HubClient, HubError};
 use std::path::PathBuf;
 
+/// Hub CLI 命令行入口
 #[derive(Parser)]
 pub struct HubCli {
+    /// 子命令
     #[command(subcommand)]
     pub command: HubCommand,
 }
 
+/// Hub 子命令
 #[derive(Subcommand)]
 pub enum HubCommand {
-    /// Browse available skills
+    /// 浏览可用技能
     Browse {
-        /// Specific category to browse
+        /// 指定分类浏览
         #[arg(long)]
         category: Option<String>,
     },
-    /// Search skills by name or description
+    /// 按名称或描述搜索技能
     Search {
-        /// Search query
+        /// 搜索关键词
         query: String,
     },
-    /// Install a skill from market
+    /// 从市场安装技能
     Install {
-        /// Skill ID (e.g., software-development/writing-plans)
+        /// 技能 ID（格式：category/name）
         skill_id: String,
-        /// Skip security check
+        /// 跳过安全检查
         #[arg(long)]
         force: bool,
     },
-    /// Install from Git URL
+    /// 从 Git URL 安装
     InstallFromGit {
-        /// Git repository URL
+        /// Git 仓库 URL
         git_url: String,
-        /// Category
+        /// 分类
         #[arg(long)]
         category: String,
-        /// Skill name
+        /// 技能名称
         #[arg(long)]
         name: String,
-        /// Branch
+        /// 分支
         #[arg(long, default_value = "main")]
         branch: String,
     },
-    /// Sync market index
+    /// 同步市场索引
     Sync {
-        /// Force refresh
+        /// 强制刷新
         #[arg(long)]
         force: bool,
     },
-    /// List installed skills
+    /// 列出已安装的技能
     List,
-    /// Update a skill
+    /// 更新技能
     Update {
         skill_id: String,
     },
-    /// Update all skills
+    /// 更新所有技能
     UpdateAll,
-    /// Uninstall a skill
+    /// 卸载技能
     Uninstall {
         skill_id: String,
     },
-    /// View skill details
+    /// 查看技能详情
     View {
         skill_id: String,
     },
-    /// View security scan results
+    /// 查看安全扫描结果
     ViewSecurity {
         skill_id: String,
     },
-    /// Trust a skill
+    /// 信任技能
     Trust {
         skill_id: String,
     },
-    /// Remove trust from a skill
+    /// 取消信任技能
     Untrust {
         skill_id: String,
     },
 }
 
+/// 执行 Hub CLI 命令
 pub async fn run_hub_command(cli: HubCli) -> Result<(), HubError> {
     let home_dir = dirs::home_dir()
         .map(|h| h.join(".hermes"))

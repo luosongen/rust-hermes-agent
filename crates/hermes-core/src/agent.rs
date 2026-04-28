@@ -36,13 +36,18 @@ use parking_lot::Mutex;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-/// Agent configuration
+/// Agent 配置结构体
 #[derive(Debug, Clone)]
 pub struct AgentConfig {
+    /// 最大迭代次数（防止无限循环）
     pub max_iterations: usize,
+    /// 使用的模型名称（格式：provider/model）
     pub model: String,
+    /// 生成温度（0.0-2.0）
     pub temperature: Option<f32>,
+    /// 最大生成 token 数
     pub max_tokens: Option<usize>,
+    /// 工作目录
     pub working_directory: std::path::PathBuf,
     /// YOLO 模式 — 跳过危险命令审批检查
     pub yolo_mode: bool,
@@ -64,7 +69,9 @@ impl Default for AgentConfig {
     }
 }
 
-/// Agent — main agentic loop
+/// Agent — 主循环执行器
+///
+/// 负责与 LLM 交互、调度工具、管理会话的核心结构体。
 pub struct Agent {
     provider: Arc<dyn LlmProvider>,
     tools: Arc<dyn ToolDispatcher>,
@@ -246,21 +253,22 @@ impl AgentBuilder {
 }
 
 impl Agent {
-    /// Returns a reference to the LLM provider.
+    /// 获取 LLM provider 的引用
     pub fn provider(&self) -> Arc<dyn LlmProvider> {
         Arc::clone(&self.provider)
     }
 
-    /// Returns a reference to the agent config.
+    /// 获取 Agent 配置的引用
     pub fn config(&self) -> &AgentConfig {
         &self.config
     }
 
-    /// Returns a reference to the tool dispatcher.
+    /// 获取工具调度器的引用
     pub fn tools(&self) -> Arc<dyn ToolDispatcher> {
         Arc::clone(&self.tools)
     }
 
+    /// 创建新的 Agent 实例
     pub fn new(
         provider: Arc<dyn LlmProvider>,
         tools: Arc<dyn ToolDispatcher>,
@@ -291,7 +299,7 @@ impl Agent {
         }
     }
 
-    /// Create Agent with nudge disabled (for subagents to prevent nested nudges)
+    /// 创建禁用 Nudge 的 Agent（用于子 Agent，防止嵌套触发）
     pub fn new_with_nudge_disabled(
         provider: Arc<dyn LlmProvider>,
         tools: Arc<dyn ToolDispatcher>,
@@ -319,7 +327,9 @@ impl Agent {
         )
     }
 
-    /// Run a conversation
+    /// 运行对话
+    ///
+    /// 执行 Agent 主循环，与 LLM 交互并返回响应。
     pub async fn run_conversation(
         &mut self,
         request: ConversationRequest,

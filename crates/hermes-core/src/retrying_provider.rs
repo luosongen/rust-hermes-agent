@@ -21,14 +21,20 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
-/// A decorator that wraps an LlmProvider with retry logic and credential pool.
+/// 带重试逻辑和凭证池的 Provider 装饰器
+///
+/// 包装底层 LlmProvider，添加自动重试和凭证管理功能。
 pub struct RetryingProvider {
+    /// 底层 LLM Provider
     inner: Arc<dyn LlmProvider>,
+    /// 凭证池
     pool: Arc<CredentialPool>,
+    /// 重试策略
     policy: RetryPolicy,
 }
 
 impl RetryingProvider {
+    /// 创建新的 RetryingProvider
     pub fn new(
         inner: Arc<dyn LlmProvider>,
         pool: Arc<CredentialPool>,
@@ -41,6 +47,7 @@ impl RetryingProvider {
         }
     }
 
+    /// 带重试逻辑的调用方法
     async fn call_with_retry(
         &self,
         request: ChatRequest,

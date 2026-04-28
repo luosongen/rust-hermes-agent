@@ -1,4 +1,22 @@
 //! approval_tools — 危险命令审批工具
+//!
+//! 本模块提供危险命令的审批机制，在执行潜在危险操作前要求用户确认。
+//!
+//! ## 主要类型
+//! - **`ApprovalStore`** — 审批状态存储，管理待审批、已批准和已拒绝的命令
+//! - **`ApprovalTool`** — 审批工具，提供检查、批准、拒绝和列出待审批命令的功能
+//!
+//! ## 危险命令检测
+//! 通过预编译的正则表达式匹配以下类型的危险命令：
+//! - 删除类（rm、rmdir）
+//! - 权限类（chmod 777、chown）
+//! - 管道注入类（curl | bash）
+//! - 提权类（sudo su）
+//! - 系统文件类（编辑 /etc/sudoers）
+//! - 网络类（iptables、ufw）
+//! - 进程类（kill -9、killall）
+//! - 格式化类（mkfs、dd）
+//! - 服务类（systemctl stop）
 
 use async_trait::async_trait;
 use hermes_core::{ToolContext, ToolError};
@@ -53,12 +71,15 @@ static COMPILED_PATTERNS: Lazy<Vec<(Regex, &'static str)>> = Lazy::new(|| {
     ]
 });
 
-/// 检查结果
+/// 命令检查结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CheckResult {
+    /// 是否需要审批
     pub needs_approval: bool,
+    /// 需要审批的原因
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// 匹配的危险模式
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern_matched: Option<String>,
 }
@@ -66,21 +87,28 @@ pub struct CheckResult {
 /// 待审批命令
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PendingCommand {
+    /// 待审批的命令内容
     pub command: String,
+    /// 关联的会话标识
     pub session_key: String,
+    /// 命令提交时间戳
     pub timestamp: f64,
+    /// 命令状态（pending/approved/denied）
     pub status: String,
 }
 
-/// 审批状态（内存）
+/// 审批状态（内存存储）
 #[derive(Debug, Default)]
 pub struct ApprovalState {
+    /// 待审批命令列表，按会话分组
     pub pending: HashMap<String, Vec<PendingCommand>>,
+    /// 已批准的命令白名单，按会话分组，值为命令哈希和批准时间戳
     pub approved: HashMap<String, HashMap<String, f64>>,
+    /// 已拒绝的命令集合，按会话分组
     pub denied: HashMap<String, HashSet<String>>,
 }
 
-/// 审批存储
+/// 审批存储，管理所有审批状态
 #[derive(Debug)]
 pub struct ApprovalStore {
     state: Arc<RwLock<ApprovalState>>,
@@ -190,6 +218,7 @@ impl Default for ApprovalStore {
     }
 }
 
+/// 计算命令的哈希值，用于唯一标识命令
 fn hash_command(cmd: &str) -> String {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
@@ -198,6 +227,7 @@ fn hash_command(cmd: &str) -> String {
     format!("{:x}", h.finish())
 }
 
+/// 获取当前时间的 Unix 时间戳（秒）
 fn now() -> f64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -205,7 +235,9 @@ fn now() -> f64 {
         .unwrap_or(0.0)
 }
 
-/// ApprovalTool
+/// 危险命令审批工具
+///
+/// 提供命令检查、批准、拒绝和列出待审批命令的功能。
 pub struct ApprovalTool {
     store: Arc<RwLock<ApprovalStore>>,
     config_path: std::path::PathBuf,
@@ -252,10 +284,13 @@ impl std::fmt::Debug for ApprovalTool {
     }
 }
 
+/// 审批工具参数
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApprovalParams {
+    /// 操作类型：check/approve/deny/list
     pub action: String,
+    /// 要检查/批准/拒绝的命令（check/approve/deny 时必填）
     #[serde(default)]
     pub command: Option<String>,
 }

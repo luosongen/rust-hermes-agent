@@ -25,19 +25,24 @@ use crate::error::SkillError;
 use crate::loader::Skill;
 use std::collections::HashMap;
 
-/// In-memory registry of loaded skills.
+/// 内存中的技能注册表
+///
+/// 使用 HashMap 存储已加载的技能，支持按名称查找和模糊搜索
 pub struct SkillRegistry {
     by_name: HashMap<String, Skill>,
 }
 
 impl SkillRegistry {
+    /// 创建空的技能注册表
     pub fn new() -> Self {
         Self {
             by_name: HashMap::new(),
         }
     }
 
-    /// Register a skill. Returns error if a skill with the same name already exists.
+    /// 注册新技能
+    ///
+    /// 如果同名技能已存在，返回 `AlreadyExists` 错误
     pub fn register(&mut self, skill: Skill) -> Result<(), SkillError> {
         let name = skill.metadata.name.clone();
         if self.by_name.contains_key(&name) {
@@ -47,17 +52,17 @@ impl SkillRegistry {
         Ok(())
     }
 
-    /// Look up a skill by name.
+    /// 按名称精确查找技能
     pub fn get(&self, name: &str) -> Option<&Skill> {
         self.by_name.get(name)
     }
 
-    /// List all skill names.
+    /// 列出所有技能名称
     pub fn names(&self) -> Vec<String> {
         self.by_name.keys().cloned().collect()
     }
 
-    /// Search skills by name or description substring.
+    /// 按名称或描述模糊搜索技能（不区分大小写）
     pub fn search(&self, query: &str) -> Vec<&Skill> {
         let query_lower = query.to_lowercase();
         self.by_name
@@ -69,28 +74,28 @@ impl SkillRegistry {
             .collect()
     }
 
-    /// Total count of registered skills.
+    /// 已注册技能总数
     pub fn len(&self) -> usize {
         self.by_name.len()
     }
 
-    /// Returns true if the registry is empty.
+    /// 检查注册表是否为空
     pub fn is_empty(&self) -> bool {
         self.by_name.is_empty()
     }
 
-    /// List all skills in the registry.
+    /// 列出所有技能
     pub fn list(&self) -> Vec<&Skill> {
         self.by_name.values().collect()
     }
 
-    /// Update an existing skill (replaces if exists).
+    /// 更新已有技能（存在则替换）
     pub fn update(&mut self, skill: Skill) {
         let name = skill.metadata.name.clone();
         self.by_name.insert(name, skill);
     }
 
-    /// Unregister a skill by name.
+    /// 注销指定名称的技能
     pub fn unregister(&mut self, name: &str) -> Option<Skill> {
         self.by_name.remove(name)
     }
